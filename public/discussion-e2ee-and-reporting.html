@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Discussion widget: end-to-end encryption and reporting</title>
+    <style>
+      @font-face {
+        font-family: "Grotesk";
+        src: url("HankenGrotesk-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "Antonio";
+        src: url("Antonio-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 700;
+      }
+
+      :root {
+        --bg: #f6f4f8;
+        --surface: #ffffff;
+        --fg: #1d1a24;
+        --muted: #645e73;
+        --line: #dcd7e6;
+        --orange: #c9490a;
+        --violet: #7147d6;
+        --violet-soft: #ece5fb;
+        --warn-soft: #fdebdf;
+        --code-bg: #efecf5;
+        --good: #17805f;
+        --bad: #b3261e;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15131b;
+          --surface: #1e1b27;
+          --fg: #ece9f3;
+          --muted: #a39cb5;
+          --line: #353044;
+          --orange: #ff8a4a;
+          --violet: #ad8cff;
+          --violet-soft: #2b2440;
+          --warn-soft: #3a2618;
+          --code-bg: #2a2636;
+          --good: #4fd1a5;
+          --bad: #ff8a80;
+          color-scheme: dark;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Grotesk", ui-sans-serif, system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        padding: 40px 20px 96px;
+      }
+      main { max-width: 46rem; margin: 0 auto; }
+      h1, h2 { font-family: "Antonio", "Arial Narrow", sans-serif; text-wrap: balance; }
+      h1 { font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; margin: 8px 0 12px; font-weight: 600; }
+      h2 { font-size: 1.6rem; line-height: 1.15; font-weight: 500; margin: 56px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+      h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 1.3rem; }
+      li { margin-bottom: 6px; }
+      a { color: var(--violet); }
+      .eyebrow { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+      .lede { font-size: 1.08rem; color: var(--muted); }
+      .part { font-family: "Antonio", "Arial Narrow", sans-serif; font-size: 1rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--orange); margin: 72px 0 -40px; }
+      code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.86em; }
+      code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+      pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.5; margin: 0 0 14px; }
+      pre code { background: none; padding: 0; font-size: 1em; overflow-wrap: normal; }
+
+      nav { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 24px 0 0; }
+      nav ol { margin: 6px 0 0; columns: 2; column-gap: 28px; }
+      @media (max-width: 34rem) { nav ol { columns: 1; } }
+
+      .note { border-radius: 10px; padding: 14px 18px; margin: 0 0 14px; background: var(--violet-soft); }
+      .note.warn { background: var(--warn-soft); }
+      .note p:last-child, .note ul:last-child, .note ol:last-child { margin-bottom: 0; }
+      .note .eyebrow { display: block; margin-bottom: 4px; color: var(--violet); }
+      .note.warn .eyebrow { color: var(--orange); }
+
+      .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 14px; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+      th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+      tr:last-child td { border-bottom: 0; }
+      th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+      td.nowrap { white-space: nowrap; }
+      .yes { color: var(--good); font-weight: 600; }
+      .no { color: var(--bad); font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">oder.locker · design notes · nothing here is built</div>
+      <h1>End-to-end encryption and reporting for discussions</h1>
+      <p class="lede">
+        Two proposals for the voice widget and how they fit together: encrypting the audio so that neither
+        Cloudflare nor our own server can hear it, and letting a participant report another with a recording made
+        on their own device.
+      </p>
+
+      <div class="note">
+        <span class="eyebrow">Short answers</span>
+        <ul>
+          <li><strong>Can we do end-to-end encryption?</strong> Yes. The media part is small. The hard part is agreeing on keys in a way the server cannot interfere with, and that part can only be made partly trustworthy in a web app.</li>
+          <li><strong>Do we need audio workers for performance?</strong> Not for performance. Encrypting voice is about 50 tiny frames a second, which is nothing. But the standard browser API for this runs in a Web Worker by design, so there will be one anyway. An <code>AudioWorklet</code> is the wrong tool and is not needed.</li>
+          <li><strong>Does local recording for reports work?</strong> Technically yes, it is cheap, and it is the one moderation approach that still works with end-to-end encryption. Its two real problems are not technical: recording someone's voice without consent is a criminal offence in Germany, and a recording uploaded by a user is not proof.</li>
+          <li><strong>What I would build first:</strong> reporting with a pairwise block (sections 8 to 12), then encryption.</li>
+        </ul>
+      </div>
+
+      <nav>
+        <span class="eyebrow">Contents</span>
+        <ol>
+          <li><a href="#today">Where we are today</a></li>
+          <li><a href="#threat">What E2EE would and would not protect</a></li>
+          <li><a href="#frames">Encrypting the audio frames</a></li>
+          <li><a href="#workers">Workers and performance</a></li>
+          <li><a href="#keys">Agreeing on keys</a></li>
+          <li><a href="#changes">What would change in our code</a></li>
+          <li><a href="#e2ee-risks">Risks and unknowns</a></li>
+          <li><a href="#report-idea">Reporting: the idea</a></li>
+          <li><a href="#report-how">How local recording would work</a></li>
+          <li><a href="#consent">Consent and the law</a></li>
+          <li><a href="#trust">Can a recording be trusted?</a></li>
+          <li><a href="#blocking">Blocking</a></li>
+          <li><a href="#together">How the two fit together</a></li>
+          <li><a href="#order">Suggested order</a></li>
+        </ol>
+      </nav>
+
+      <div class="part">Part one · encryption</div>
+
+      <h2 id="today">1. Where we are today</h2>
+      <p>
+        Audio is encrypted between each browser and Cloudflare's SFU (DTLS-SRTP, automatic). Inside the SFU it is
+        decrypted and re-encrypted for each listener. So the audio is protected from the network, but Cloudflare
+        is technically able to access it. Our own worker never sees audio, only connection setup text.
+      </p>
+      <p>
+        End-to-end encryption (E2EE) adds a second layer: the browser encrypts each audio frame with a key only
+        the participants hold, <em>before</em> WebRTC's own encryption. The SFU still unwraps the outer layer and
+        forwards the frame, but what it forwards is ciphertext.
+      </p>
+
+      <h2 id="threat">2. What E2EE would and would not protect</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Against</th><th>Protected?</th><th>Why</th></tr></thead>
+          <tbody>
+            <tr><td>Someone on the network</td><td class="yes">Already</td><td>DTLS-SRTP does this today.</td></tr>
+            <tr><td>Cloudflare's SFU reading or recording audio</td><td class="yes">Yes</td><td>It only ever handles ciphertext.</td></tr>
+            <tr><td>Our server, if it only watches (logs, a leak, a subpoena for stored data)</td><td class="yes">Yes</td><td>With keys agreed between browsers (section 5), nothing the server relays is enough to decrypt.</td></tr>
+            <tr><td>Our server, if it actively cheats during key exchange</td><td class="no">Only with verification</td><td>The server relays the public keys and could swap them for its own. Participants would have to compare a short code out loud to detect it.</td></tr>
+            <tr><td>Us shipping different JavaScript</td><td class="no">No</td><td>The page that does the encrypting is served by us. A changed script could send the key anywhere. Every web-based E2EE system has this limit; apps installed from a store have it less.</td></tr>
+            <tr><td>The other participant recording the call</td><td class="no">No</td><td>They hear it, so they can record it. No encryption changes that.</td></tr>
+            <tr><td>Metadata: who talked to whom, when, for how long</td><td class="no">No</td><td>The Durable Object needs all of that to run the conversation.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The honest claim we could make afterwards is: "audio is end-to-end encrypted between participants; our
+        servers and Cloudflare relay it but cannot hear it." Not: "nobody could ever listen." The gap between
+        those two is the last two <span class="no">No</span> rows above.
+      </p>
+
+      <h2 id="frames">3. Encrypting the audio frames</h2>
+      <p>
+        Browsers expose a hook between the audio encoder and the network, called WebRTC Encoded Transform. On the
+        sending side our code receives each encoded Opus frame (about 20 ms of sound, typically 60 to 120 bytes)
+        and may replace its bytes. On the receiving side it gets the frame before the decoder.
+      </p>
+      <h3>The API, in two flavours</h3>
+      <ul>
+        <li>
+          <strong>Standard:</strong> <code>RTCRtpScriptTransform</code>. You create a Worker and attach it:
+<pre><code>const worker = new Worker(new URL("./e2ee.worker.ts", import.meta.url), { type: "module" });
+sender.transform = new RTCRtpScriptTransform(worker, { side: "send" });
+receiver.transform = new RTCRtpScriptTransform(worker, { side: "receive", from: userId });</code></pre>
+          Inside the worker an <code>rtctransform</code> event hands over a readable and a writable stream of
+          frames. Supported in Safari and Firefox, and in recent Chrome.
+        </li>
+        <li>
+          <strong>Legacy Chrome:</strong> <code>sender.createEncodedStreams()</code>, with
+          <code>encodedInsertableStreams: true</code> in the peer connection's configuration. Needed only if we
+          want to support Chrome versions from before it shipped the standard API.
+        </li>
+      </ul>
+      <p>
+        Exact version numbers should be checked on MDN or caniuse at the time of building. A browser with neither
+        API must be refused a place in an encrypted conversation, not silently let in unencrypted.
+      </p>
+
+      <h3>What the transform does</h3>
+<pre><code>// sending, per frame
+const counter = next++;                       // never reused with the same key
+const iv = makeIv(counter);                   // 12 bytes
+const sealed = await crypto.subtle.encrypt(
+  { name: "AES-GCM", iv, tagLength: 32 },     // short tag: see below
+  key, frame.data);
+frame.data = concat(sealed, header(keyId, counter));
+controller.enqueue(frame);</code></pre>
+      <p>The receiver reads the header, finds the key for that sender and key id, decrypts, and passes the frame on. A frame that fails to decrypt is dropped, which sounds like a tiny gap.</p>
+      <ul>
+        <li><strong>Format.</strong> There is a standard for exactly this: SFrame (RFC 9605). It defines the header (key id and counter) and the cipher suites. Following it is better than inventing a layout, even if we write the few dozen lines ourselves.</li>
+        <li><strong>Overhead.</strong> Every frame grows by the authentication tag plus a few header bytes, 50 times a second. With a full 16-byte tag that is around 8 kbit/s on top of a voice stream of perhaps 30, which is a lot. SFrame's audio suites use short tags (4 bytes) for this reason; the trade-off is a weaker guarantee against forged frames, which for live voice is acceptable.</li>
+        <li><strong>Counters.</strong> AES-GCM breaks badly if a key is ever used twice with the same counter. Each sender has its own key, so a counter that starts at zero when the key is created and only goes up is enough.</li>
+        <li><strong>Mute.</strong> A muted microphone still produces (silent) frames, which get encrypted like any other. Nothing special.</li>
+      </ul>
+
+      <h2 id="workers">4. Workers and performance</h2>
+      <p>Three different things get called "audio workers", and they have different answers.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Thing</th><th>What it is for</th><th>Do we need it?</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap">Web Worker</td><td>Running JavaScript off the main thread.</td><td><strong>Yes, for E2EE</strong>, because <code>RTCRtpScriptTransform</code> only runs in one. Not because the work is heavy.</td></tr>
+            <tr><td class="nowrap"><code>AudioWorklet</code></td><td>Processing raw, uncompressed sound samples in real time (effects, analysis, custom codecs).</td><td><strong>No.</strong> We never touch raw samples. Encryption happens on compressed frames, after the encoder.</td></tr>
+            <tr><td class="nowrap">Worker for recording</td><td>—</td><td><strong>No.</strong> <code>MediaRecorder</code> (part two) is implemented natively by the browser and already runs off the main thread.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        On cost: 50 frames per second, each around a hundred bytes, with hardware-accelerated AES. That is
+        microseconds of work per frame, for each of at most three streams. The reason the API insists on a worker
+        is <em>jitter</em>, not throughput: if the main thread is busy for 200 ms rendering the feed or typing out
+        a chat bubble, frames handled there would be late and the audio would crackle. In a worker they are not
+        affected.
+      </p>
+      <p>
+        One practical note for this project: the worker is a separate bundle. Vite handles
+        <code>new Worker(new URL(…, import.meta.url))</code> out of the box, and it must only be created in the
+        browser (inside the existing effect in <code>Discussion.tsx</code>), never during server rendering.
+      </p>
+
+      <h2 id="keys">5. Agreeing on keys</h2>
+      <p>This is where the real design decisions are. Three options, from weakest to strongest.</p>
+
+      <h3>Option A: the server hands out a key</h3>
+      <p>
+        The Durable Object generates a random key per conversation and sends it over the WebSocket. Very easy.
+        It hides the audio from the SFU, but our own server holds the key, so it is <strong>not</strong>
+        end-to-end encryption and must not be called that. Since the SFU and the worker are both Cloudflare
+        services, it barely changes who could listen. Not recommended.
+      </p>
+
+      <h3>Option B: the browsers agree between themselves, the server only relays</h3>
+      <ol>
+        <li>Each browser creates a throwaway ECDH key pair when the conversation starts (<code>crypto.subtle.generateKey</code>, curve P-256 or X25519) and sends the public half to the others through the Durable Object.</li>
+        <li>Each pair of participants derives a shared secret from their own private key and the other's public key (<code>deriveBits</code>, then HKDF). The server sees only public keys, which are not enough.</li>
+        <li>Each participant creates a random <em>sender key</em> for their own audio, and sends it to each other participant encrypted under the pairwise secret.</li>
+        <li>Everyone now holds one key per speaker. Frames are encrypted with the speaker's sender key.</li>
+      </ol>
+      <p>
+        "Sender keys" is what makes three people work: each stream is encrypted once and all listeners can read
+        it, instead of encrypting separately per listener.
+      </p>
+      <p>
+        <strong>When membership changes</strong> (the third person joins within 30 seconds, or someone leaves),
+        everyone makes a fresh sender key and distributes it again. This way a late joiner cannot decrypt what
+        was said before they arrived, and someone who left cannot decrypt what follows.
+      </p>
+      <p>
+        <strong>What it achieves:</strong> a server that only observes learns nothing. <strong>What it does
+        not:</strong> a server that actively swaps public keys in step 1 can sit in the middle unnoticed.
+      </p>
+
+      <h3>Option C: B, plus a way to check</h3>
+      <p>
+        Both browsers compute a short code from the public keys they saw (say four digits or three emoji) and
+        display it. If the participants read it to each other and it matches, nobody swapped keys. This is what
+        Signal's safety numbers and Matrix's emoji verification do.
+      </p>
+      <p>
+        It fits oddly here: these are strangers with three minutes and a list of questions to get through. A
+        small, optional "security code: 4 7 1 9" in the widget costs nothing and lets anyone who cares check. A
+        mandatory step would eat the conversation.
+      </p>
+
+      <div class="note">
+        <span class="eyebrow">Recommendation</span>
+        <p>
+          Option B with the optional code from C. Larger protocols built for this (MLS, RFC 9420) solve problems
+          we do not have: big groups, long-lived sessions, members on several devices. For two or three people
+          and ten minutes, pairwise ECDH with sender keys is the appropriate size.
+        </p>
+      </div>
+
+      <h2 id="changes">6. What would change in our code</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>File</th><th>Change</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>app/lib/discussion.ts</code></td><td>One new message in each direction, <code>key { to, payload }</code> / <code>key { from, payload }</code>. The payload is opaque to the server.</td></tr>
+            <tr><td class="nowrap"><code>workers/discussions.ts</code></td><td>Relay <code>key</code> messages to the named participant, only within the same conversation, with a size cap. Nothing else: the server gains no knowledge.</td></tr>
+            <tr><td class="nowrap"><code>app/lib/e2ee.worker.ts</code> (new)</td><td>The transform: holds the keys, encrypts outgoing frames, decrypts incoming ones.</td></tr>
+            <tr><td class="nowrap"><code>app/lib/e2ee.ts</code> (new)</td><td>Key pairs, derivation, sender keys, the verification code. Runs on the main thread and posts keys to the worker.</td></tr>
+            <tr><td class="nowrap"><code>Discussion.tsx</code></td><td>Create the worker; attach the transform to the sender in <code>publish()</code> and to each receiver in the <code>track</code> handler; exchange keys when <code>state</code> shows a membership change; show a lock and the code; refuse to start if the browser lacks the API.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The SFU calls, the matching, the timers and the abuse limits stay exactly as they are. The SFU does not
+        need to be told anything.
+      </p>
+      <p>
+        One ordering detail matters: keys must be in place before audio is unmuted to the user. Until a
+        listener has the speaker's key, frames are dropped. That is safe (silence, not noise), but the widget
+        should show "securing…" for the moment it takes.
+      </p>
+
+      <h2 id="e2ee-risks">7. Risks and unknowns</h2>
+      <ul>
+        <li><strong>Unconfirmed: does Cloudflare's SFU forward frames it cannot parse?</strong> For audio it should, since an SFU forwards packets without decoding them, and Cloudflare's documentation does not mention end-to-end encryption either way. This needs a half-day experiment before committing: encrypt on one side, decrypt on the other, through the real SFU.</li>
+        <li><strong>Three browser engines.</strong> The transform API is where Chrome, Safari and Firefox differ most in WebRTC. Expect most of the effort to go into testing on real phones, not into the cryptography.</li>
+        <li><strong>Debugging gets harder.</strong> "No audio" gains a new cause (keys out of step) that looks identical to the network ones.</li>
+        <li><strong>Server-side features become impossible.</strong> Anything that needs the server to hear the audio stops working: server-side recording, transcription, automatic moderation. Cloudflare's WebSocket adapter (section 11) decodes Opus on Cloudflare's side and would receive garbage.</li>
+        <li><strong>Custom cryptography.</strong> Even assembled from standard parts, the key exchange is security-critical code written by us. It deserves a review by someone who does this for a living before the word "end-to-end" goes on the site.</li>
+      </ul>
+
+      <div class="part">Part two · reporting</div>
+
+      <h2 id="report-idea">8. Reporting: the idea</h2>
+      <p>
+        Your proposal: every participant's browser records the conversation locally from the moment it starts. If
+        nobody reports, the recording is thrown away and never leaves the device. If someone clicks
+        <em>Report</em>, their browser uploads it, and you can listen and block the offender.
+      </p>
+      <p>
+        This is a sound design and a well-known one: it is how reporting works in end-to-end encrypted messengers,
+        where the server has nothing to look at and a report is one participant voluntarily disclosing what they
+        received. Its strengths are that nothing is stored unless there is a complaint, and that it captures what
+        happened <em>before</em> the click, which is the part that matters.
+      </p>
+
+      <h2 id="report-how">9. How local recording would work</h2>
+      <h3>In the browser</h3>
+      <ul>
+        <li><strong><code>MediaRecorder</code></strong> records a <code>MediaStream</code> to compressed audio. We already hold the streams: one per remote participant (the <code>voices</code> state) and the user's own microphone.</li>
+        <li><strong>One recorder per participant, not a mix.</strong> In a three-person call a single mixed recording cannot tell you who said what, and you need to block the right person. Separate files, each labelled with a user id, can. Recording the reporter's own microphone too gives context ("what was that a reply to?").</li>
+        <li><strong>Format.</strong> Chrome and Firefox produce <code>audio/webm</code> with Opus; Safari produces <code>audio/mp4</code>. Use <code>MediaRecorder.isTypeSupported</code> and store the type with the file.</li>
+        <li><strong>Size.</strong> Ask for a low bitrate (<code>audioBitsPerSecond: 24000</code>). Ten minutes is then under 2 MB per participant, held in memory as chunks. No IndexedDB, no worker.</li>
+        <li><strong>Lifetime.</strong> Start when the first audio arrives; stop when the widget is over. Keep the chunks for a few minutes afterwards so "report" still works from the "conversation has ended" state, then drop them. Reloading the page loses them, which is acceptable.</li>
+      </ul>
+<pre><code>const recorder = new MediaRecorder(voice, { audioBitsPerSecond: 24_000 });
+const chunks: Blob[] = [];
+recorder.ondataavailable = ({ data }) =&gt; chunks.push(data);
+recorder.start(5_000);            // a chunk every 5 s, so little is lost on a crash
+// on report:
+const file = new Blob(chunks, { type: recorder.mimeType });</code></pre>
+
+      <h3>On the server</h3>
+      <ul>
+        <li><strong>An upload route</strong> (a normal React Router action, like the profile picture upload): signed-in users only, a hard size limit checked on <code>Content-Length</code> before reading the body (the pattern already in <code>home.tsx</code>), and a rate limit on reports per account.</li>
+        <li><strong>A membership check.</strong> The server must confirm the reporter and the reported person really were in a conversation together, recently. Today the Durable Object deletes a conversation the moment it ends, so it would need to keep a small record (conversation id, member ids, start and end) for a day or so.</li>
+        <li><strong>Storage.</strong> A <em>separate, private</em> R2 bucket. The existing <code>PHOTOS</code> bucket is served publicly through <code>media.oder.locker</code> and must not be used. A <code>reports</code> table in D1: reporter, reported, conversation, time, file keys, a reason, status, decision.</li>
+        <li><strong>Retention.</strong> Delete the audio when the report is decided, or after a fixed period (say 30 days), whichever comes first. The daily cron that already purges tokens can do it.</li>
+        <li><strong>A place to review.</strong> Someone has to listen. That means a small admin page, and deciding who has access to it.</li>
+      </ul>
+
+      <h2 id="consent">10. Consent and the law</h2>
+      <div class="note warn">
+        <span class="eyebrow">This needs a lawyer before it ships</span>
+        <p>I am not one, and this section is a list of things to ask about, not advice. But they are serious enough to shape the design.</p>
+        <ul>
+          <li><strong>Recording itself.</strong> In Germany, recording another person's non-public spoken words without authorisation is a criminal offence (§ 201 StGB, <em>Verletzung der Vertraulichkeit des Wortes</em>), and so is making such a recording available to a third party. A private conversation between two users is not public. "It only stays on the device unless reported" does not obviously help, because the recording is what is prohibited. The usual way to be authorised is consent from everyone recorded.</li>
+          <li><strong>What is being said.</strong> The whole point of the widget is to discuss a political question. Recordings will therefore routinely reveal political opinions, which the GDPR treats as a special category of personal data (Art. 9) with stricter conditions. A voice is also personal data in itself.</li>
+          <li><strong>Who is responsible.</strong> Our code makes the recording, so we cannot treat it as something users do on their own.</li>
+        </ul>
+      </div>
+      <p>What follows for the design, whatever the legal detail turns out to be:</p>
+      <ul>
+        <li><strong>Tell people before they join, and make them agree.</strong> A clear line on the widget before searching starts: the conversation is recorded on each participant's device, and a participant can send it to the moderators with a report. Starting means consenting. No dark pattern, no pre-ticked box.</li>
+        <li><strong>Show it while it happens.</strong> A visible recording indicator for the whole conversation.</li>
+        <li><strong>Update the privacy page</strong> (<code>app/routes/privacy.tsx</code>): what is recorded, where it is stored, for how long, who can hear it, and how to ask for deletion.</li>
+        <li><strong>Keep the minimum.</strong> Upload only on report, restrict access, delete on a schedule.</li>
+        <li><strong>Consider a shorter window.</strong> Keeping only the last two minutes in memory instead of everything reduces what can leak, at the price of missing earlier context. Worth raising with whoever advises you.</li>
+      </ul>
+
+      <h2 id="trust">11. Can a recording be trusted?</h2>
+      <p>
+        The upload comes from the reporter's device, and the reporter controls that device. They can cut the
+        recording, splice it, or replace it with something else entirely, including a cloned voice. So a report
+        is a <strong>claim with supporting material</strong>, not proof, and blocking must not be automatic.
+      </p>
+      <p>What the server <em>can</em> know for certain, and should check:</p>
+      <ul>
+        <li>These two accounts were in the same conversation, at this time, for this long.</li>
+        <li>The recording's length is plausible for that conversation.</li>
+        <li>How many reports this account has filed, and how many have been filed against the other, by how many different people.</li>
+      </ul>
+      <p>That last point is the strongest signal available. One report is an accusation. Five reports from five unrelated accounts is a pattern, whatever any single recording contains.</p>
+
+      <h3>The alternative: recording on the server</h3>
+      <p>
+        Cloudflare's SFU has a "WebSocket adapter" (in beta) that streams a track's audio to a backend as raw
+        PCM. The Durable Object could start one when a participant presses report.
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th></th><th>Local recording, upload on report</th><th>Server capture, started on report</th><th>Server records everything</th></tr></thead>
+          <tbody>
+            <tr><td>Captures what led to the report</td><td class="yes">Yes</td><td class="no">No, only what follows</td><td class="yes">Yes</td></tr>
+            <tr><td>Recording can be faked by the reporter</td><td class="no">Yes</td><td class="yes">No</td><td class="yes">No</td></tr>
+            <tr><td>Audio stored without a complaint</td><td class="yes">Never</td><td class="yes">Never</td><td class="no">Always</td></tr>
+            <tr><td>Works with end-to-end encryption</td><td class="yes">Yes</td><td class="no">No</td><td class="no">No</td></tr>
+            <tr><td>Extra cost</td><td>None</td><td>SFU egress while capturing</td><td>SFU egress and storage for every call</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Recording everything on the server is the most reliable evidence and the worst for privacy; it is hard to
+        justify for a discussion of political opinions. Capturing only after the click misses the offence. Local
+        recording is the best fit, as long as reports are treated as claims.
+      </p>
+      <p>
+        A cryptographic fix for the trust problem exists in theory (each speaker signs their audio, so a recording
+        can be checked against the speaker's key) but it is impractical: signatures would have to cover the
+        compressed frames, the reporter would have to upload those instead of a playable file, and it adds per
+        frame cost. Not worth it at this scale.
+      </p>
+
+      <h2 id="blocking">12. Blocking</h2>
+      <p>Two different tools, and the first needs no review at all.</p>
+      <h3>Pairwise block: "never match me with them again"</h3>
+      <ul>
+        <li>Applied instantly when someone reports, or offered on its own as "don't match us again" with no accusation attached.</li>
+        <li>A <code>blocks</code> table in D1 (blocker, blocked). The worker loads the user's list when the WebSocket opens and passes it to the Durable Object alongside <code>x-user</code>; matching skips those pairs in both directions.</li>
+        <li>Cannot be abused to harm anyone: the worst a false block does is keep two people apart.</li>
+        <li>Reporting should also end the conversation for the reporter immediately.</li>
+      </ul>
+      <h3>Ban: "this account may not use discussions"</h3>
+      <ul>
+        <li>Set by you after reviewing reports. A column on <code>users</code>, checked in <code>discuss()</code> in <code>workers/app.ts</code> before the upgrade is forwarded.</li>
+        <li>Should never be triggered by a single report automatically, for the reasons in section 11.</li>
+      </ul>
+      <div class="note warn">
+        <span class="eyebrow">The weak point: guest accounts</span>
+        <p>
+          Anyone can sign in as <code>guest_&lt;word&gt;</code> with no email. A banned guest picks a new word and
+          is back in seconds, so a ban only means something for accounts tied to an email address. The simplest
+          fix is to allow voice discussions only for email-verified accounts. Banning by IP address is the other
+          route, and it is both unreliable (shared and mobile addresses) and a privacy cost of its own.
+        </p>
+      </div>
+
+      <div class="part">Together</div>
+
+      <h2 id="together">13. How the two fit together</h2>
+      <ul>
+        <li><strong>They are compatible.</strong> Recording happens in the browser after decryption, on the same streams that are played. Encryption does not get in its way.</li>
+        <li><strong>Local reporting is what makes E2EE affordable.</strong> Once the server cannot hear anything, participant reports are the only moderation possible. Building reporting first means encryption does not remove a safety net.</li>
+        <li><strong>Be precise in what we tell users.</strong> "End-to-end encrypted" and "the other person can send a recording to moderators" are both true at once, and both must be said. Encryption protects the conversation from outsiders, not from the people in it.</li>
+        <li><strong>A reported recording is no longer end-to-end protected.</strong> Once uploaded it is ordinary data on our server and has to be guarded as such.</li>
+      </ul>
+
+      <h2 id="order">14. Suggested order</h2>
+      <ol>
+        <li><strong>Pairwise block</strong> and a "don't match us again" button. Small, no legal questions, immediately useful.</li>
+        <li><strong>Restrict voice to email-verified accounts</strong>, so that any later ban has teeth.</li>
+        <li><strong>Get advice on recording and consent.</strong> The answer decides whether step 4 looks like this document or needs to change.</li>
+        <li><strong>Reporting with local recording:</strong> consent line, indicator, recorders, upload route, private bucket, reports table, retention, a review page, the ban flag.</li>
+        <li><strong>A half-day experiment</strong> to confirm encrypted frames pass through Cloudflare's SFU on Chrome, Safari and Firefox.</li>
+        <li><strong>End-to-end encryption</strong> with pairwise ECDH, sender keys and the optional verification code, followed by an outside review before it is advertised.</li>
+      </ol>
+      <p>
+        Steps 1 and 2 address harm that can happen today. Step 6 protects against a threat (Cloudflare or our own
+        server listening) that is real but much less likely than one user being unpleasant to another, which is
+        why it comes last.
+      </p>
+    </main>
+  </body>
+</html>

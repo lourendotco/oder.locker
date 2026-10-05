@@ -8,7 +8,61 @@
 	"compatibility_date": "2026-09-26",
 	"main": "./workers/app.ts",
 	"vars": {
-		"VALUE_FROM_CLOUDFLARE": "Hello from Cloudflare"
+		"EMAIL_FROM": "no-reply@oder.locker",
+		// The Realtime SFU app that carries the discussions' audio
+		// (workers/discussions.ts). Its secret is a worker secret:
+		// wrangler secret put REALTIME_APP_SECRET
+		"REALTIME_APP_ID": "4cedaad186e6a5ba6fe7fc9415f3063c"
+	},
+	// matches users looking to discuss and runs their conversations
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "DISCUSSIONS",
+				"class_name": "Discussions"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["Discussions"]
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "locker",
+			"database_id": "de4a677b-3afa-49b8-9f46-e7585bbbb3a0",
+			"migrations_dir": "migrations",
+			// dev uses the real database too, so accounts and their pictures
+			// (already in the real bucket) match the deployed app
+			"remote": true
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "PHOTOS",
+			"bucket_name": "locker",
+			"jurisdiction": "eu",
+			// dev uses the real bucket too: pictures are served from
+			// media.oder.locker, which only knows the real one
+			"remote": true
+		}
+	],
+	// re-encodes uploaded profile pictures (app/lib/photo.server.ts)
+	"images": {
+		"binding": "IMAGES"
+	},
+	"send_email": [
+		{
+			"name": "EMAIL",
+			"remote": true
+		}
+	],
+	"triggers": {
+		// 0 3 * * * token purge (authPurgeExpiredTokens)
+		"crons": ["0 3 * * *"]
 	},
 	"observability": {
 		"enabled": true

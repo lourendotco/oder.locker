@@ -1,15 +1,296 @@
 @import "tailwindcss" source(".");
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-space: "Space", ui-sans-serif, system-ui, sans-serif;
+  --font-grotesk: "Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-antonio: "Antonio", ui-sans-serif, system-ui, sans-serif;
+  --color-primary: #f7661e;
+  --color-secondary: rgb(148, 102, 242);
+  --color-tertiary: #ad87fa;
 }
 
-html,
-body {
-  @apply bg-white dark:bg-gray-950;
+@utility bg-page-gradient {
+  background-image: linear-gradient(
+    to bottom,
+    color-mix(in oklab, var(--color-secondary) 70%, transparent) 5%,
+    white 50%,
+    white 70%,
+    var(--color-primary)
+  );
+}
 
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
+/* <ViewTransition enter="slide-in-right"> */
+::view-transition-new(.slide-in-right) {
+  animation: slide-in-right 350ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+/* clip-path shrinks in step with the translate, so the page is cut off at its
+   own final right edge, i.e. it never shows outside the rounded phone frame */
+@keyframes slide-in-right {
+  from {
+    translate: 100% 0;
+    clip-path: inset(0 100% 0 0);
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-new(.slide-in-right) {
+    animation: none;
+  }
+}
+
+/* During a transition the header (view-transition-name: header) is painted
+   as a snapshot above the document, where the phone frame no longer clips
+   it: its square top corners would cover the frame's rounded ones. The frame
+   is only rounded from the sm breakpoint up (see Shell). */
+@media (width >= 40rem) {
+  ::view-transition-group(header) {
+    clip-path: inset(0 round 2.5rem 2.5rem 0 0);
+  }
+}
+
+/* yet-another-react-lightbox, swipe to dismiss: while the picture is dragged
+   up or down the library sets --yarl__pull_offset (px, signed) and fades the
+   picture, stopping at 50%. Fade the backdrop instead, all the way to
+   transparent over a 200px drag. */
+.yarl__container {
+  --pull-distance: max(
+    var(--yarl__pull_offset, 0px),
+    -1 * var(--yarl__pull_offset, 0px)
+  );
+  /* tan(atan2(a, b)) is a / b without the units: 0 at rest, 1 at 200px. */
+  --pull-progress: min(1, tan(atan2(var(--pull-distance), 200px)));
+  --yarl__container_background_color: rgb(
+    0 0 0 / calc(1 - var(--pull-progress))
+  );
+  transition: background-color 100ms linear;
+}
+
+/* The caption, gradient included, and the close button go as soon as a drag
+   starts and come back if the drag is cancelled. */
+.yarl__slide_captions_container,
+.yarl__toolbar {
+  opacity: calc(1 - var(--pull-progress) * 1000);
+  transition: opacity 150ms ease-out;
+}
+
+/* On release the library resets --yarl__pull_offset at once, while the
+   lightbox is still fading out (it has lost .yarl__portal_open by then).
+   Delay the way back past that fade so the backdrop doesn't turn black again
+   and the caption and close button don't reappear. */
+.yarl__portal:not(.yarl__portal_open)
+  :is(.yarl__container, .yarl__slide_captions_container, .yarl__toolbar) {
+  transition-delay: 1s;
+}
+
+/* !important also beats the opacity the library animates on release. */
+.yarl__carousel {
+  opacity: 1 !important;
+}
+
+/* A voice in the theme page's dialog, once picked: a short squeeze, then the
+   row springs shut and the dialog closes. The row is a one-track grid, so its
+   height can animate from auto (1fr) to 0. */
+.voice-pop-out {
+  animation: voice-pop-out 450ms forwards;
+}
+
+@keyframes voice-pop-out {
+  0% {
+    grid-template-rows: 1fr;
+    scale: 1;
+    opacity: 1;
+    animation-timing-function: ease-out;
+  }
+  25% {
+    grid-template-rows: 1fr;
+    scale: 0.96;
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  100% {
+    grid-template-rows: 0fr;
+    scale: 1;
+    opacity: 0;
+  }
+}
+
+/* Still an animation, as its end is what closes the dialog. */
+@keyframes voice-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-pop-out {
+    animation-name: voice-fade-out;
+    animation-duration: 200ms;
+  }
+}
+
+/* The dots of a chat bubble that is still being typed: each hops in turn. */
+.typing-dot {
+  animation: typing-dot 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 150ms;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 300ms;
+}
+
+@keyframes typing-dot {
+  0%,
+  60%,
+  100% {
+    translate: 0 0;
+    opacity: 0.4;
+  }
+  30% {
+    translate: 0 -3px;
+    opacity: 1;
+  }
+}
+
+@keyframes typing-dot-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .typing-dot {
+    animation-name: typing-dot-pulse;
+  }
+}
+
+/* The discussion widget while it looks for someone: rings spread out from the
+   microphone one after the other. */
+.discussion-ring {
+  animation: discussion-ring 2.4s ease-out infinite;
+}
+
+.discussion-ring:nth-child(2) {
+  animation-delay: 1.2s;
+}
+
+@keyframes discussion-ring {
+  from {
+    scale: 1;
+    opacity: 0.5;
+  }
+  to {
+    scale: 2.2;
+    opacity: 0;
+  }
+}
+
+@keyframes discussion-ring-pulse {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discussion-ring {
+    scale: 1.5;
+    animation-name: discussion-ring-pulse;
+  }
+}
+
+/* A chat bubble showing up as typing dots: it bursts out of the corner its
+   tail is at, on the spring ChatBubble opens with (kept in sync by hand).
+   .pop-in is the same spring from the element's centre. */
+.bubble-pop-in {
+  transform-origin: bottom left;
+}
+
+.bubble-pop-in,
+.pop-in {
+  animation: bubble-pop-in 900ms
+    linear(
+      0,
+      0.03 1.6%,
+      0.121 3.4%,
+      0.646 10.4%,
+      0.851 13.8%,
+      0.992 17.4%,
+      1.036 19.3%,
+      1.064 21.3%,
+      1.078 23.6%,
+      1.077 26.3%,
+      1.013 38.2%,
+      0.995 46%,
+      1
+    );
+}
+
+/* Set --pop-in-delay to hold the element back; it stays hidden meanwhile. */
+.pop-in {
+  animation-delay: var(--pop-in-delay, 0ms);
+  animation-fill-mode: backwards;
+}
+
+@keyframes bubble-pop-in {
+  from {
+    scale: 0.4;
+    opacity: 0;
+  }
+}
+
+@keyframes bubble-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble-pop-in,
+  .pop-in {
+    animation-name: bubble-fade-in;
+  }
+}
+
+@font-face {
+  font-family: "Space";
+  src: url("/SpaceGrotesk-VariableFont_wght.ttf") format("truetype");
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Grotesk";
+  src: url("/HankenGrotesk-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Grotesk";
+  src: url("/HankenGrotesk-Italic-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Antonio";
+  src: url("/Antonio-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
 }

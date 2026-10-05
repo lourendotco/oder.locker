@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Discussion widget: how it works</title>
+    <style>
+      @font-face {
+        font-family: "Grotesk";
+        src: url("HankenGrotesk-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "Antonio";
+        src: url("Antonio-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 700;
+      }
+
+      :root {
+        --bg: #f6f4f8;
+        --surface: #ffffff;
+        --fg: #1d1a24;
+        --muted: #645e73;
+        --line: #dcd7e6;
+        --orange: #c9490a;
+        --violet: #7147d6;
+        --violet-soft: #ece5fb;
+        --warn-soft: #fdebdf;
+        --code-bg: #efecf5;
+        --browser: #7147d6;
+        --server: #c9490a;
+        --sfu: #17805f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15131b;
+          --surface: #1e1b27;
+          --fg: #ece9f3;
+          --muted: #a39cb5;
+          --line: #353044;
+          --orange: #ff8a4a;
+          --violet: #ad8cff;
+          --violet-soft: #2b2440;
+          --warn-soft: #3a2618;
+          --code-bg: #2a2636;
+          --browser: #ad8cff;
+          --server: #ff8a4a;
+          --sfu: #4fd1a5;
+          color-scheme: dark;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Grotesk", ui-sans-serif, system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        padding: 40px 20px 96px;
+      }
+      main { max-width: 46rem; margin: 0 auto; }
+      h1, h2 { font-family: "Antonio", "Arial Narrow", sans-serif; text-wrap: balance; }
+      h1 { font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; margin: 8px 0 12px; font-weight: 600; }
+      h2 { font-size: 1.6rem; line-height: 1.15; font-weight: 500; margin: 56px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+      h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 1.3rem; }
+      li { margin-bottom: 6px; }
+      a { color: var(--violet); }
+      .eyebrow { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+      .lede { font-size: 1.08rem; color: var(--muted); }
+      code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.86em; }
+      code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+      pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.5; margin: 0 0 14px; }
+      pre code { background: none; padding: 0; font-size: 1em; overflow-wrap: normal; }
+
+      nav { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 24px 0 0; }
+      nav ol { margin: 6px 0 0; columns: 2; column-gap: 28px; }
+      @media (max-width: 34rem) { nav ol { columns: 1; } }
+
+      .note { border-radius: 10px; padding: 14px 18px; margin: 0 0 14px; background: var(--violet-soft); }
+      .note.warn { background: var(--warn-soft); }
+      .note p:last-child, .note ul:last-child { margin-bottom: 0; }
+      .note .eyebrow { display: block; margin-bottom: 4px; color: var(--violet); }
+      .note.warn .eyebrow { color: var(--orange); }
+
+      .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 14px; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+      th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+      tr:last-child td { border-bottom: 0; }
+      th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+      td.nowrap { white-space: nowrap; }
+
+      /* The message sequence: one row per step, coloured by who acts. */
+      .seq { list-style: none; padding: 0; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); counter-reset: step; }
+      .seq li { display: grid; grid-template-columns: 5.5rem 1fr; gap: 12px; padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--line); }
+      .seq li:last-child { border-bottom: 0; }
+      .seq .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 3px; }
+      .seq .b .who { color: var(--browser); }
+      .seq .s .who { color: var(--server); }
+      .seq .f .who { color: var(--sfu); }
+      .seq div { min-width: 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">oder.locker · internal notes</div>
+      <h1>The discussion widget, end to end</h1>
+      <p class="lede">
+        How the voice discussion on the theme page works: the React block in the feed, the Durable Object that
+        matches people and keeps time, and the Cloudflare Realtime SFU that carries the audio.
+      </p>
+
+      <nav>
+        <span class="eyebrow">Contents</span>
+        <ol>
+          <li><a href="#pieces">The pieces</a></li>
+          <li><a href="#encryption">Is the audio encrypted?</a></li>
+          <li><a href="#lifecycle">Life of one widget</a></li>
+          <li><a href="#react">The React side</a></li>
+          <li><a href="#protocol">The WebSocket protocol</a></li>
+          <li><a href="#server">The Durable Object</a></li>
+          <li><a href="#sfu">The SFU and WebRTC</a></li>
+          <li><a href="#bug">The bug that was fixed</a></li>
+          <li><a href="#config">Configuration and deploy</a></li>
+          <li><a href="#gaps">Known gaps</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="pieces">1. The pieces</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>File</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>app/lib/discussion.ts</code></td><td>The durations and the message types. Imported by both the browser code and the worker, so the two ends cannot drift apart.</td></tr>
+            <tr><td class="nowrap"><code>app/components/chat/Discussion.tsx</code></td><td>The widget: a block on the feed. Also the <code>useDiscussion()</code> hook that starts one.</td></tr>
+            <tr><td class="nowrap"><code>app/routes/theme.tsx</code></td><td>The two buttons that call <code>start()</code>: the microphone in <code>DiscussInvite</code> and the first row of the Add-a-voice dialog.</td></tr>
+            <tr><td class="nowrap"><code>workers/app.ts</code></td><td>Takes the <code>/discuss</code> WebSocket upgrade, checks who is asking, hands it to the Durable Object.</td></tr>
+            <tr><td class="nowrap"><code>workers/discussions.ts</code></td><td>The <code>Discussions</code> Durable Object: matching, timers, extension votes, and every call to the SFU.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Three parties are involved in a conversation, and it helps to keep them apart:</p>
+      <ul>
+        <li><strong style="color: var(--browser)">The browser</strong> owns the microphone and one <code>RTCPeerConnection</code>.</li>
+        <li><strong style="color: var(--server)">The Durable Object</strong> is the only thing that knows who is talking to whom and when it ends. It never touches audio.</li>
+        <li><strong style="color: var(--sfu)">The SFU</strong> (selective forwarding unit) receives each participant's audio and forwards it to the others. It knows nothing about users, conversations or timers.</li>
+      </ul>
+      <p>
+        Browsers never connect to each other. Each one has a single media connection to Cloudflare, and a single
+        WebSocket to the Durable Object for everything else.
+      </p>
+
+      <h2 id="encryption">2. Is the audio encrypted?</h2>
+      <p><strong>Yes in transit, automatically. No, not end to end.</strong> Nothing in our code turns encryption on or off; the first part comes with WebRTC and the second part would have to be built.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Leg</th><th>Protection</th><th>Who can read it</th></tr></thead>
+          <tbody>
+            <tr><td>Audio, browser ↔ SFU</td><td>DTLS-SRTP. WebRTC makes this mandatory: a browser will not send unencrypted media, and there is no option to disable it.</td><td>The two ends of that leg: the browser and Cloudflare's SFU.</td></tr>
+            <tr><td>Audio, inside the SFU</td><td>The SFU decrypts what it receives and re-encrypts it separately for each listener. Each leg has its own keys.</td><td>Cloudflare, technically. This is what "not end to end" means.</td></tr>
+            <tr><td>Signalling, browser ↔ worker</td><td>The WebSocket is <code>wss://</code> in production (TLS). In local dev it is plain <code>ws://</code> on localhost.</td><td>The browser and our worker.</td></tr>
+            <tr><td>Worker ↔ SFU API</td><td>HTTPS, authorised with the app secret.</td><td>Our worker and Cloudflare.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <span class="eyebrow">What this means in practice</span>
+        <ul>
+          <li>Nobody on the network path (Wi-Fi operator, ISP) can listen in.</li>
+          <li>Participants never learn each other's IP address, because they only ever connect to Cloudflare. A peer-to-peer call would expose it.</li>
+          <li>Cloudflare, as the operator of the SFU, is in a position to access the audio. We do not record anything, and nothing in our code asks the SFU to record or to send audio anywhere else.</li>
+          <li>Our own worker never sees audio at all, only the SDP text used to set the connection up.</li>
+        </ul>
+      </div>
+      <p>
+        True end-to-end encryption on top of an SFU is possible. It means encrypting each audio frame in the browser
+        before WebRTC sends it (Encoded Transforms / "insertable streams", usually with the SFrame format), and
+        getting a shared key to the participants without the server seeing it. None of that is implemented. If the
+        privacy policy says anything about calls, it should say "encrypted in transit", not "end-to-end encrypted".
+      </p>
+
+      <h2 id="lifecycle">3. Life of one widget</h2>
+      <p>The steps from a click to the end of a conversation, for the second of two people to arrive.</p>
+      <ol class="seq">
+        <li class="b"><span class="who">Browser</span><div>The user clicks the microphone. <code>start()</code> appends a <code>&lt;Discussion&gt;</code> to the feed and marks a discussion as running, which disables both entry points.</div></li>
+        <li class="b"><span class="who">Browser</span><div><code>getUserMedia({ audio: true })</code>. If refused, the widget is over ("The microphone can't be used").</div></li>
+        <li class="b"><span class="who">Browser</span><div>Opens <code>wss://…/discuss</code>. The session cookie goes with it.</div></li>
+        <li class="s"><span class="who">Worker</span><div>Checks <code>Origin</code>, resolves the cookie to a user, forwards the upgrade to the Durable Object with the user in an <code>x-user</code> header.</div></li>
+        <li class="s"><span class="who">Object</span><div>Finds someone already waiting, creates a conversation ending in 3:00, and sends both a <code>state</code> message. (With nobody waiting it would send <code>waiting</code> and set a 60 s alarm.)</div></li>
+        <li class="b"><span class="who">Browser</span><div>On the first <code>state</code>: creates the peer connection, adds the microphone as a send-only transceiver, makes an offer, sends <code>publish</code> with the SDP.</div></li>
+        <li class="s"><span class="who">Object</span><div>Calls the SFU: <code>POST /sessions/new</code>, then <code>POST /sessions/{id}/tracks/new</code> with the offer.</div></li>
+        <li class="f"><span class="who">SFU</span><div>Returns a session id and an SDP answer.</div></li>
+        <li class="s"><span class="who">Object</span><div>Stores the session id on the socket and sends <code>published</code> with the answer.</div></li>
+        <li class="b"><span class="who">Browser</span><div>Applies the answer. ICE and DTLS run; the connection state reaches <code>connected</code>. Sends <code>connected</code>.</div></li>
+        <li class="s"><span class="who">Object</span><div>Marks this participant <code>live</code> and broadcasts a new <code>state</code>.</div></li>
+        <li class="b"><span class="who">Browser</span><div>Each browser sees someone <code>live</code> whose audio it does not have yet, and sends <code>pull</code> with their user id.</div></li>
+        <li class="s"><span class="who">Object</span><div>Translates user ids to SFU session ids (same conversation only) and calls <code>POST /sessions/{mine}/tracks/new</code> with remote tracks.</div></li>
+        <li class="f"><span class="who">SFU</span><div>Returns an SDP <em>offer</em> describing the new incoming audio.</div></li>
+        <li class="b"><span class="who">Browser</span><div>Applies the offer, creates an answer, sends <code>answer</code>. The <code>track</code> event fires and an <code>&lt;audio&gt;</code> element starts playing.</div></li>
+        <li class="s"><span class="who">Object</span><div><code>PUT /sessions/{mine}/renegotiate</code> with the answer, then sends <code>ready</code>: the browser may pull again.</div></li>
+        <li class="s"><span class="who">Object</span><div>At 3:00 (or later if extended) the alarm fires: sends <code>over</code> and closes the sockets.</div></li>
+        <li class="b"><span class="who">Browser</span><div>Closes the peer connection, stops the microphone, shows "The conversation has ended", re-enables the entry points.</div></li>
+      </ol>
+
+      <h2 id="react">4. The React side</h2>
+
+      <h3>How it gets onto the feed</h3>
+      <p>
+        The feed (<code>feed.tsx</code>) is a list of React elements in a jotai atom. <code>useDiscussion()</code>
+        returns <code>{ discussing, start }</code>:
+      </p>
+<pre><code>start: () => {
+  if (discussing) return;
+  setDiscussing(true);
+  append(&lt;Discussion key={`discussion-${Date.now()}`} /&gt;);
+}</code></pre>
+      <p>
+        <code>discussingAtom</code> is the "has it run its course" flag. It is true from the click until the widget
+        is over, and both buttons are <code>disabled={discussing}</code>. The key is unique per click, so a
+        finished widget stays in the feed as a record and a new one is added below it.
+      </p>
+      <p>
+        Feed blocks normally wait their turn: a block is <code>active</code> only when every block before it has
+        called <code>finish()</code>. A discussion can last ten minutes, so it calls <code>finish()</code> as soon
+        as it mounts. Voices added during a conversation still type out straight away.
+      </p>
+
+      <h3>State</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>phase</code></td><td><code>"mic"</code> → <code>"searching"</code> → <code>"live"</code>.</td></tr>
+            <tr><td class="nowrap"><code>over</code></td><td><code>null</code> while running, otherwise why it ended. Once set, the widget only shows a sentence.</td></tr>
+            <tr><td class="nowrap"><code>conversation</code></td><td>The last <code>state</code> message: participants, votes, whether extensions are used up.</td></tr>
+            <tr><td class="nowrap"><code>deadline</code>, <code>now</code></td><td>When the search or conversation runs out, and a clock ticking every 250 ms. Both are <code>performance.now()</code> values.</td></tr>
+            <tr><td class="nowrap"><code>voices</code></td><td>One <code>MediaStream</code> per incoming audio track, each rendered as an <code>&lt;audio autoPlay&gt;</code>.</td></tr>
+            <tr><td class="nowrap"><code>muted</code>, <code>audioFailed</code></td><td>UI flags.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        The server sends <em>remaining milliseconds</em>, never a timestamp. The browser turns that into a local
+        deadline. This way a device whose clock is wrong still shows the right countdown.
+      </p>
+
+      <h3>The one big effect</h3>
+      <p>
+        Everything with a lifetime (microphone, WebSocket, peer connection) lives in local variables inside a
+        single <code>useEffect</code>, not in React state. They are not things to render, and keeping them in
+        one closure means one <code>release()</code> function can tear all of it down. Two details:
+      </p>
+      <ul>
+        <li>
+          <strong>Strict Mode.</strong> In development React mounts, unmounts and remounts every component. The
+          <code>gone</code> flag makes the first run abandon itself: if the microphone permission resolves after
+          cleanup, its tracks are stopped at once instead of leaking a live microphone.
+        </li>
+        <li>
+          <strong>Message queue.</strong> Handling a message can be asynchronous (applying an SDP takes a moment).
+          Messages are chained onto one promise so they are always handled in arrival order:
+<pre><code>let queue = Promise.resolve();
+ws.addEventListener("message", ({ data }) =&gt; {
+  queue = queue.then(() =&gt; (gone ? undefined : receive(JSON.parse(data))))…
+});
+ws.addEventListener("close", () =&gt; queue.then(() =&gt; end("error")));</code></pre>
+          The close handler waits for the queue too, so an <code>over</code> message that arrived just before the
+          close sets the real reason before the fallback "connection was lost" can.
+        </li>
+      </ul>
+      <p>
+        The buttons need to reach into that closure, which is what the refs <code>hangUp</code>,
+        <code>extend</code> and <code>microphone</code> are for.
+      </p>
+
+      <h3>Pulling other people's audio</h3>
+      <p>The <code>pull()</code> function is the heart of the client's audio logic:</p>
+<pre><code>const pull = () =&gt; {
+  if (!connected || pulling || !latest) return;
+  const ids = latest.participants
+    .filter(({ id, live }) =&gt; live &amp;&amp; id !== latest.you &amp;&amp; !pulled.has(id))
+    .map(({ id }) =&gt; id);
+  if (!ids.length) return;
+  pulling = true;
+  ids.forEach((id) =&gt; pulled.add(id));
+  say({ type: "pull", ids });
+};</code></pre>
+      <p>
+        It is called whenever something changes that might make a pull possible: a new <code>state</code>, our own
+        connection coming up, or <code>ready</code> after the previous pull. The three guards are: our own
+        connection is up, no other pull is in flight, and there is somebody live we have not asked for yet. This
+        is how a third participant's audio gets added to an existing call without special-casing.
+      </p>
+
+      <h3>Mute, leave, extend</h3>
+      <ul>
+        <li><strong>Mute</strong> sets <code>track.enabled = false</code>. The connection stays up and sends silence. Nothing is sent to the server, so the others are not told you muted.</li>
+        <li><strong>Leave</strong> closes the WebSocket. The server notices the close; there is no "leave" message.</li>
+        <li><strong>Extend</strong> appears when <code>remaining ≤ 30 s</code> and <code>!maxed</code>. Clicking sends <code>extend</code> and marks you as agreed immediately, without waiting for the server's confirmation.</li>
+      </ul>
+
+      <h2 id="protocol">5. The WebSocket protocol</h2>
+      <p>All messages are JSON with a <code>type</code>. The types are in <code>app/lib/discussion.ts</code>.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Browser → server</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>publish { sdp, mid }</code></td><td>My offer, and which media line carries the microphone.</td></tr>
+            <tr><td class="nowrap"><code>connected</code></td><td>My connection to the SFU is up; others may pull me.</td></tr>
+            <tr><td class="nowrap"><code>pull { ids }</code></td><td>I want the microphones of these user ids.</td></tr>
+            <tr><td class="nowrap"><code>answer { sdp }</code></td><td>My answer to the SFU's offer.</td></tr>
+            <tr><td class="nowrap"><code>extend</code></td><td>I agree to one more minute.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Server → browser</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>waiting { remaining }</code></td><td>Nobody yet. Search time left.</td></tr>
+            <tr><td class="nowrap"><code>state { you, participants, remaining, maxed, votes }</code></td><td>The whole conversation, sent on every change: someone joined, left, went live, voted, or the end moved.</td></tr>
+            <tr><td class="nowrap"><code>published { sdp }</code></td><td>The SFU's answer to <code>publish</code>.</td></tr>
+            <tr><td class="nowrap"><code>offer { sdp }</code></td><td>The SFU's offer after <code>pull</code>.</td></tr>
+            <tr><td class="nowrap"><code>ready</code></td><td>The answer has reached the SFU; the next pull can go.</td></tr>
+            <tr><td class="nowrap"><code>audio-failed</code></td><td>An SFU call failed. The conversation continues without (some) audio.</td></tr>
+            <tr><td class="nowrap"><code>over { reason }</code></td><td><code>none</code>, <code>ended</code>, <code>left</code>, <code>busy</code> or <code>error</code>. The socket closes right after.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        <code>state</code> is always the full picture, never a delta. A browser that misses one is corrected by
+        the next. The browser never receives another participant's SFU session id; it asks by user id and the
+        server does the lookup, after checking both are in the same conversation.
+      </p>
+
+      <h2 id="server">6. The Durable Object</h2>
+      <p>
+        A Durable Object is a single-threaded instance with its own storage. That is exactly what matchmaking
+        needs: two people arriving at the same moment are handled one after the other, so they cannot both be
+        told "nobody is waiting". There is one instance for everyone, addressed as
+        <code>env.DISCUSSIONS.getByName("theme")</code>.
+      </p>
+
+      <h3>Getting in: <code>workers/app.ts</code></h3>
+      <ul>
+        <li><strong>Origin check.</strong> A WebSocket is not subject to CORS, so any website could try to open one to us with the visitor's cookie. Requests whose <code>Origin</code> is not our own get a 403.</li>
+        <li><strong>Authentication.</strong> The existing <code>getUser(request)</code> resolves the session cookie. No session, 401.</li>
+        <li><strong>Identity.</strong> The user is passed to the object in an <code>x-user</code> header that the worker sets itself, overwriting anything the client sent. The object is not reachable from the internet except through this path.</li>
+      </ul>
+
+      <h3>Where state lives</h3>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>What</th><th>Where</th><th>Contents</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap">A "seat"</td><td>The socket's attachment (<code>serializeAttachment</code>)</td><td><code>user</code>, <code>since</code>, <code>conversation</code> (null while waiting), <code>session</code> (SFU), <code>live</code>, <code>over</code></td></tr>
+            <tr><td class="nowrap">A conversation</td><td><code>ctx.storage.kv</code> under <code>conversation:&lt;id&gt;</code></td><td><code>startedAt</code>, <code>endsAt</code>, <code>votes</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Nothing is kept in instance variables. The object uses the WebSocket <em>Hibernation</em> API: when no
+        events arrive, Cloudflare can evict it from memory while the sockets stay connected, and wake it for the
+        next message or alarm. Anything in memory would be lost; attachments and storage survive. It also means
+        an idle call costs no compute time.
+      </p>
+      <p>There is no list of "who is waiting". A waiter is simply a socket whose seat has no conversation.</p>
+
+      <h3>Matching, on connect</h3>
+      <ol>
+        <li>The same user already has a socket → <code>over busy</code>.</li>
+        <li>Someone is waiting → create a conversation with the one waiting longest.</li>
+        <li>Otherwise, a conversation with exactly two members that started under 30 s ago → join it.</li>
+        <li>Otherwise → wait.</li>
+      </ol>
+      <p>A third person joins a conversation whose clock is already running; they get the time that is left, not a fresh three minutes.</p>
+
+      <h3>One alarm for every timer</h3>
+      <p>
+        A Durable Object has a single alarm. After every change <code>schedule()</code> sets it to the earliest
+        deadline that exists: any waiter's <code>since + 60 s</code> or any conversation's <code>endsAt</code>.
+        When it fires, <code>alarm()</code> dismisses whoever has run out and schedules the next one. Alarms are
+        durable: they fire even if the object was evicted in the meantime.
+      </p>
+
+      <h3>Extension</h3>
+      <ul>
+        <li>A vote is only accepted in the last 30 s and while the conversation is under 10 minutes in total. Anything else is ignored, so a tampered client cannot extend early.</li>
+        <li><code>tally()</code> drops votes from people who have left and extends when every remaining member has voted: <code>endsAt += 60 s</code>, capped at <code>startedAt + 10 min</code>, votes cleared.</li>
+        <li>If one of three leaves while the other two have both agreed, the extension goes through.</li>
+        <li><code>maxed</code> in <code>state</code> tells the browser there is nothing left to ask for.</li>
+      </ul>
+
+      <h3>Leaving</h3>
+      <p>
+        <code>webSocketClose</code> and <code>webSocketError</code> both end up in <code>left()</code>. If fewer
+        than two members remain, the conversation ends for the one left with reason <code>left</code>; otherwise
+        the others get a new <code>state</code>. The <code>over</code> flag on a seat marks a socket the server
+        itself dismissed, so its eventual close event is not processed a second time.
+      </p>
+
+      <h3>Abuse limits</h3>
+      <p>
+        The browser is not trusted: anyone can write their own client. And the audio does not travel over the
+        WebSocket, so closing the socket does not stop it. A browser keeps its connection to the SFU for as long
+        as it likes. Cloudflare bills what the SFU <em>sends out</em> (publishing into it is free), so the things
+        to control are how long and how much it sends to each client.
+      </p>
+      <ul>
+        <li><strong>The server cuts the media.</strong> When a conversation ends, or someone's socket closes, <code>silence()</code> asks the SFU for that session's tracks and force-closes all of them (<code>PUT /sessions/{id}/tracks/close</code> with <code>force: true</code>). The connection may stay up, but nothing is forwarded in either direction. A publish or pull that was in flight when the end came is closed as soon as it returns.</li>
+        <li><strong>One pull per participant.</strong> The seat records whose microphone it has asked for. Asking again gets <code>ready</code> and no new track, so a client cannot multiply what is sent to it.</li>
+        <li><strong>Audio only.</strong> A <code>publish</code> whose SDP is not exactly one <code>m=audio</code> line is refused, so nobody can publish video.</li>
+        <li><strong>One publish per seat</strong>, marked before the SFU is called, so two at the same instant cannot both pass.</li>
+        <li><strong>One seat per account</strong>, and every seat needs a signed-in session.</li>
+      </ul>
+
+      <h2 id="sfu">7. The SFU and WebRTC</h2>
+
+      <h3>Sessions and tracks</h3>
+      <p>
+        In Cloudflare's model a <em>session</em> is one peer connection to the SFU and a <em>track</em> is one
+        stream of audio or video in it. A track is identified by the publisher's session id plus a name. Every
+        participant here has one session, publishes one track named <code>mic</code>, and pulls the
+        <code>mic</code> track of each other participant into that same session. So a three-person call is three
+        sessions, each sending one track and receiving two.
+      </p>
+      <p>
+        The SFU has no notion of rooms. "These three people are in a call" exists only in our Durable Object,
+        which is why it must be the one to decide who may pull what.
+      </p>
+
+      <h3>Why the server makes the calls</h3>
+      <p>
+        The SFU's HTTPS API (<code>https://rtc.live.cloudflare.com/v1/apps/{appId}/…</code>) is authorised with
+        the app secret. Anyone holding it could pull any track in the app. It therefore stays in the worker, and
+        the browser's SDP is relayed through the WebSocket.
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Our message</th><th>SFU call</th><th>Direction of the SDP</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>publish</code></td><td><code>POST /sessions/new</code><br /><code>POST /sessions/{id}/tracks/new</code> (location <code>local</code>)</td><td>Browser offers, SFU answers.</td></tr>
+            <tr><td class="nowrap"><code>pull</code></td><td><code>POST /sessions/{id}/tracks/new</code> (location <code>remote</code>)</td><td>SFU offers.</td></tr>
+            <tr><td class="nowrap"><code>answer</code></td><td><code>PUT /sessions/{id}/renegotiate</code></td><td>Browser answers.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Note the direction flips. When publishing, the browser knows what it wants to send, so it writes the
+        offer. When pulling, only the SFU knows what the incoming audio looks like, so it writes the offer and
+        the browser answers.
+      </p>
+
+      <h3>One change at a time</h3>
+      <p>
+        An SDP exchange on a session must finish before the next one starts, or the SFU rejects it. The browser
+        enforces this for its own session with the <code>pulling</code> flag, cleared only by <code>ready</code>,
+        which the server sends after <code>renegotiate</code> has returned. Because each browser is the only
+        source of changes to its own session, the server needs no queues.
+      </p>
+
+      <h3>Connectivity</h3>
+      <ul>
+        <li>The peer connection is created with Cloudflare's STUN server (<code>stun.cloudflare.com:3478</code>), which lets the browser discover its public address.</li>
+        <li>After creating the offer the browser waits up to one second for ICE candidates to be gathered, so they are inside the SDP it sends. There is no separate "trickle" of candidates over the WebSocket.</li>
+        <li><code>bundlePolicy: "max-bundle"</code> puts outgoing and incoming audio on one network transport, so adding a participant does not need a new connection.</li>
+        <li>No TURN server is configured. The SFU is on public addresses, which works from almost all networks; a network that blocks UDP outright would fail to connect.</li>
+      </ul>
+
+      <h2 id="bug">8. The bug that was fixed</h2>
+      <p>
+        The first version always showed "The audio couldn't connect" on one of two devices, while audio flowed in
+        the other direction. The SFU's error was:
+      </p>
+<pre><code>not_found_track_error: Track not found on remote peer. Make sure the
+publisher peer is connected and sending packets for this track</code></pre>
+      <p>
+        The server announced a participant as available as soon as the SFU had accepted their offer. But at that
+        point their browser had not even received the answer, let alone connected. Whoever published second was
+        announced early, and the first device's pull for them was refused. The second device pulled a moment
+        later, when the first was long connected, so that direction worked.
+      </p>
+      <p>
+        The fix is the <code>connected</code> message and the <code>live</code> flag: a microphone is announced
+        only when its owner's connection is up, and a browser only pulls once its own connection is up (pulling
+        on an unconnected session gave a different error, <code>transport_unavailable_error</code>).
+      </p>
+      <p>
+        A side effect worth knowing: the SFU also refuses a pull when the publisher is connected but sending
+        nothing (<code>empty_track_error</code>). A muted microphone still sends silence, so mute is fine.
+      </p>
+
+      <h2 id="config">9. Configuration and deploy</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Setting</th><th>Where</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap"><code>REALTIME_APP_ID</code></td><td><code>vars</code> in <code>wrangler.jsonc</code>. Not a secret.</td></tr>
+            <tr><td class="nowrap"><code>REALTIME_APP_SECRET</code></td><td><code>.dev.vars</code> locally. In production: <code>wrangler secret put REALTIME_APP_SECRET</code>.</td></tr>
+            <tr><td class="nowrap"><code>DISCUSSIONS</code></td><td>Durable Object binding in <code>wrangler.jsonc</code>, with migration <code>v1</code> creating the class.</td></tr>
+            <tr><td class="nowrap">Durations</td><td>Constants at the top of <code>app/lib/discussion.ts</code>. Shorten them to test the extension flow quickly.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note warn">
+        <span class="eyebrow">About this file</span>
+        <p>
+          Everything in <code>public/</code> is deployed and readable by anyone at
+          <code>/discussion-widget.html</code>. It contains no secrets, but it does describe the internals. Also,
+          <code>public/_headers</code> marks every static file as cacheable for a year, so a browser that has
+          loaded this page will not see later edits without a hard reload. Move it out of <code>public/</code>
+          before deploying if either matters.
+        </p>
+      </div>
+
+      <h2 id="gaps">10. Known gaps</h2>
+      <ul>
+        <li><strong>A connection that never comes up is silent.</strong> If a browser stays in "connecting", it is never announced and nobody hears anything, with no message until the browser gives up (about 30 s), when "The audio couldn't connect" appears. This happened once in testing and was not explained.</li>
+        <li><strong>No retry.</strong> A failed pull is reported and not attempted again.</li>
+        <li><strong>The 10-minute cap has not been run in real time.</strong> The matching, the 60 s search limit, the 30 s join window, leaving, and one extension were tested against the real object; the cap was only checked by reading the code.</li>
+        <li><strong>No limit on how often one account can discuss.</strong> Each conversation is capped at 10 minutes and its audio is cut at the SFU when it ends (section 6), but nothing stops two accounts from starting one conversation after another.</li>
+        <li><strong>Deploys interrupt calls.</strong> Deploying restarts the Durable Object and drops every WebSocket. Widgets in progress show "The connection was lost".</li>
+        <li><strong>One object for everyone.</strong> It walks all its sockets on each event. Fine for tens or hundreds of concurrent users, not for thousands.</li>
+        <li><strong>No end-to-end encryption</strong>, as described in section 2.</li>
+        <li><strong>Others are not told when you mute</strong>, and there is no indicator of who is speaking.</li>
+      </ul>
+    </main>
+  </body>
+</html>

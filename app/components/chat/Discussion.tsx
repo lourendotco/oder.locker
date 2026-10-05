@@ -269,6 +269,21 @@ function Discussion() {
     return () => clearInterval(timer);
   }, [running]);
 
+  // Escape calls the search off, wherever focus is. Not a conversation:
+  // that takes its button. And not from under a dialog, which the same
+  // key closes.
+  const searching = !over && phase === "searching";
+  useEffect(() => {
+    if (!searching) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented) return;
+      if (document.querySelector("dialog:modal")) return;
+      hangUp.current?.();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [searching]);
+
   const remaining = deadline - now;
   const others = conversation?.participants.filter(
     ({ id }) => id !== conversation.you,
@@ -429,6 +444,7 @@ function Discussion() {
               </div>
               <button
                 type="button"
+                aria-keyshortcuts="Escape"
                 onClick={() => hangUp.current?.()}
                 className="cursor-pointer text-xs underline underline-offset-4"
               >

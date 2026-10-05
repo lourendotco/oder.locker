@@ -24,9 +24,14 @@ export default function Shell({ children }: { children: ReactNode }) {
       {/* The frame and what scrolls inside it are two elements. The frame's
           drop-shadow is a filter, which makes it the containing block of
           every position: fixed element in it; were it the scroller as well,
-          those would scroll away with the page. */}
-      <div className="flex h-full min-h-screen max-w-sm flex-col bg-neutral-100 sm:aspect-9/16 sm:max-h-full sm:min-h-0 sm:w-auto sm:overflow-hidden sm:rounded-[2.5rem] sm:border-[0.5px] sm:drop-shadow-sm">
-        <div className="flex flex-1 flex-col overflow-clip px-2.5 sm:min-h-0 sm:overflow-auto sm:scrollbar-none">
+          those would scroll away with the page.
+          The frame clips rather than hides: overflow: hidden would leave it
+          scrollable from script, and scrollIntoView would move the header
+          along with everything else. The scroller is relative so that what
+          is absolute inside it (sr-only) scrolls with it, not with the
+          frame. */}
+      <div className="flex h-full min-h-screen max-w-sm flex-col bg-neutral-100 sm:aspect-9/16 sm:max-h-full sm:min-h-0 sm:w-auto sm:overflow-clip sm:rounded-[2.5rem] sm:border-[0.5px] sm:drop-shadow-sm">
+        <div className="relative flex flex-1 flex-col overflow-clip px-2.5 sm:min-h-0 sm:overflow-auto sm:scrollbar-none">
         {/* Focuses instead of following the fragment: the home page reads
             the URL's fragment as an email address. */}
         <a

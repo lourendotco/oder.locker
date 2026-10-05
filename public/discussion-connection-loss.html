@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Discussion widget: when a connection drops</title>
+    <style>
+      @font-face {
+        font-family: "Grotesk";
+        src: url("HankenGrotesk-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 900;
+      }
+      @font-face {
+        font-family: "Antonio";
+        src: url("Antonio-VariableFont_wght.ttf") format("truetype");
+        font-weight: 100 700;
+      }
+
+      :root {
+        --bg: #f6f4f8;
+        --surface: #ffffff;
+        --fg: #1d1a24;
+        --muted: #645e73;
+        --line: #dcd7e6;
+        --orange: #c9490a;
+        --violet: #7147d6;
+        --violet-soft: #ece5fb;
+        --warn-soft: #fdebdf;
+        --code-bg: #efecf5;
+        --browser: #7147d6;
+        --server: #c9490a;
+        --sfu: #17805f;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #15131b;
+          --surface: #1e1b27;
+          --fg: #ece9f3;
+          --muted: #a39cb5;
+          --line: #353044;
+          --orange: #ff8a4a;
+          --violet: #ad8cff;
+          --violet-soft: #2b2440;
+          --warn-soft: #3a2618;
+          --code-bg: #2a2636;
+          --browser: #ad8cff;
+          --server: #ff8a4a;
+          --sfu: #4fd1a5;
+          color-scheme: dark;
+        }
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Grotesk", ui-sans-serif, system-ui, sans-serif;
+        font-size: 16px;
+        line-height: 1.6;
+        padding: 40px 20px 96px;
+      }
+      main { max-width: 46rem; margin: 0 auto; }
+      h1, h2 { font-family: "Antonio", "Arial Narrow", sans-serif; text-wrap: balance; }
+      h1 { font-size: clamp(2rem, 7vw, 3rem); line-height: 1.05; margin: 8px 0 12px; font-weight: 600; }
+      h2 { font-size: 1.6rem; line-height: 1.15; font-weight: 500; margin: 56px 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 16px; }
+      h3 { font-size: 1.05rem; margin: 28px 0 8px; }
+      p { margin: 0 0 12px; }
+      ul, ol { margin: 0 0 12px; padding-left: 1.3rem; }
+      li { margin-bottom: 6px; }
+      a { color: var(--violet); }
+      .eyebrow { font-size: 12px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+      .lede { font-size: 1.08rem; color: var(--muted); }
+      code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.86em; }
+      code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+      pre { background: var(--code-bg); padding: 14px 16px; border-radius: 10px; overflow-x: auto; line-height: 1.5; margin: 0 0 14px; }
+      pre code { background: none; padding: 0; font-size: 1em; overflow-wrap: normal; }
+
+      nav { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 24px 0 0; }
+      nav ol { margin: 6px 0 0; columns: 2; column-gap: 28px; }
+      @media (max-width: 34rem) { nav ol { columns: 1; } }
+
+      .note { border-radius: 10px; padding: 14px 18px; margin: 0 0 14px; background: var(--violet-soft); }
+      .note.warn { background: var(--warn-soft); }
+      .note p:last-child, .note ul:last-child { margin-bottom: 0; }
+      .note .eyebrow { display: block; margin-bottom: 4px; color: var(--violet); }
+      .note.warn .eyebrow { color: var(--orange); }
+
+      .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); margin: 0 0 14px; }
+      table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+      th, td { text-align: left; vertical-align: top; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+      tr:last-child td { border-bottom: 0; }
+      th { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; white-space: nowrap; }
+      td.nowrap { white-space: nowrap; }
+
+      /* The message sequence: one row per step, coloured by who acts. */
+      .seq { list-style: none; padding: 0; margin: 0 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); counter-reset: step; }
+      .seq li { display: grid; grid-template-columns: 5.5rem 1fr; gap: 12px; padding: 10px 14px; margin: 0; border-bottom: 1px solid var(--line); }
+      .seq li:last-child { border-bottom: 0; }
+      .seq .who { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding-top: 3px; }
+      .seq .b .who { color: var(--browser); }
+      .seq .s .who { color: var(--server); }
+      .seq .f .who { color: var(--sfu); }
+      .seq div { min-width: 0; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">oder.locker · internal notes · 5 October 2026</div>
+      <h1>When a discussion's connection drops</h1>
+      <p class="lede">
+        One conversation ended early with a server error in the log. This page records what happened, what the
+        code does when either of a participant's two connections is lost, and what it does not do: there is no
+        retry anywhere. Background on the widget itself is in
+        <a href="discussion-widget.html">The discussion widget, end to end</a>.
+      </p>
+
+      <nav>
+        <span class="eyebrow">Contents</span>
+        <ol>
+          <li><a href="#incident">What happened</a></li>
+          <li><a href="#log">Reading the server log</a></li>
+          <li><a href="#two">Two connections, two failures</a></li>
+          <li><a href="#browser">What the browser recovers by itself</a></li>
+          <li><a href="#code">What our code does</a></li>
+          <li><a href="#change">The change that was made</a></li>
+          <li><a href="#unknown">What is not known</a></li>
+          <li><a href="#retry">What a retry would take</a></li>
+        </ol>
+      </nav>
+
+      <h2 id="incident">1. What happened</h2>
+      <p>
+        Two people were talking. About 3 minutes 30 seconds in, during the first one-minute extension (the
+        conversation was due to end at 4:00), it stopped for both:
+      </p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Participant</th><th>Saw</th><th>Which means</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap">A</td><td>"The other participant left the conversation."</td><td>The server sent <code>over { reason: "left" }</code>. It only does that from <code>left()</code>, when the other socket has closed by itself.</td></tr>
+            <tr><td class="nowrap">B</td><td>A connection failure. The exact sentence was not written down; from the code it should have been "The connection was lost."</td><td>B's WebSocket closed without the server having sent <code>over</code> first. The widget shows this for any such close.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>The server log had one line, with the error's own message missing from what was copied:</p>
+      <pre><code>Closing the SFU tracks failed:
+    at Discussions.sfu (index.js:1319:37)
+    at async Discussions.silence (index.js:1279:28)
+    at async Discussions.left (index.js:1265:3)
+    at async Discussions.webSocketClose (index.js:1172:3)</code></pre>
+      <div class="note">
+        <span class="eyebrow">In short</span>
+        <p>
+          B's WebSocket closed. That is what ended the conversation. The logged error came afterwards, from the
+          clean-up, and did not cause anything either participant saw. Why B's socket closed is not known
+          (<a href="#unknown">section 7</a>).
+        </p>
+      </div>
+
+      <h2 id="log">2. Reading the server log</h2>
+      <p>The stack trace gives the order of events inside the Durable Object:</p>
+      <ol class="seq">
+        <li class="b"><span class="who">Browser B</span><div>Its WebSocket closes. Not through <code>dismiss()</code>: the seat is not marked <code>over</code>, so the close is processed.</div></li>
+        <li class="s"><span class="who">Object</span><div><code>webSocketClose(B)</code> calls <code>left(B)</code>, which marks B's seat <code>over</code>.</div></li>
+        <li class="s"><span class="who">Object</span><div>Fewer than two members remain, so <code>end(id, "left", B)</code>: A is sent <code>over { reason: "left" }</code> and its socket is closed, the conversation is deleted from storage, and A's SFU tracks are closed with <code>silence(A.session)</code>.</div></li>
+        <li class="s"><span class="who">Object</span><div>Back in <code>left()</code>: <code>schedule()</code>, then <code>silence(B.session)</code> for the participant whose socket closed.</div></li>
+        <li class="f"><span class="who">SFU</span><div>Refuses the call. <code>sfu()</code> throws, <code>silence()</code> catches it and logs "Closing the SFU tracks failed".</div></li>
+      </ol>
+      <p>
+        The trace goes <code>left → silence</code> directly, not through <code>end()</code>, so the session the
+        SFU refused was B's own, not A's.
+      </p>
+      <p>
+        Which HTTP status came back was not captured. Cloudflare's documentation describes one case that fits:
+        a session whose WebRTC connection has been lost can be reused for about 30 seconds, and after that
+        calls on it return HTTP <code>410</code> with <code>session_error</code>. If that is what happened,
+        B's audio connection had already been gone for a while when the socket closed, and there was nothing
+        left for <code>silence()</code> to close.
+      </p>
+      <div class="note">
+        <span class="eyebrow">One thing the outcome rules out</span>
+        <p>
+          A restart of the Durable Object (a deploy, or the dev server reloading the worker) drops every
+          socket at once. Both participants would then have seen "The connection was lost", and no
+          <code>webSocketClose</code> would have run. A was told "left", so the object was alive and saw only
+          B's socket go.
+        </p>
+      </div>
+
+      <h2 id="two">3. Two connections, two failures</h2>
+      <p>Each participant has two separate connections, and they fail separately:</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Connection</th><th>Carries</th><th>If it is lost</th></tr></thead>
+          <tbody>
+            <tr><td class="nowrap">WebSocket to the Durable Object</td><td>Who is in the conversation, the timer, extension votes, the SDP exchanges.</td><td>The widget ends at once for that participant ("The connection was lost"). The other is told "left", or gets a new <code>state</code> if a third person remains.</td></tr>
+            <tr><td class="nowrap"><code>RTCPeerConnection</code> to the SFU</td><td>The audio, both directions.</td><td>The widget carries on, silent, with "The audio couldn't connect." in red. The timer keeps running and the other participant is not told.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        A network outage on one side usually takes both, but not at the same moment. The SFU notices missing
+        media within seconds. A WebSocket whose network has vanished can sit open for much longer, until the
+        operating system or an intermediary gives up on the TCP connection. So the audio connection going
+        first and the socket following later is the expected order for a dropped network.
+      </p>
+
+      <h2 id="browser">4. What the browser recovers by itself</h2>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Situation</th><th>Browser, unaided</th></tr></thead>
+          <tbody>
+            <tr><td>Short interruption on the same network; the peer connection goes <code>disconnected</code></td><td>Keeps probing the network paths it already has and often returns to <code>connected</code>. No code needed.</td></tr>
+            <tr><td>Network change (Wi-Fi to mobile, new IP address) or a longer outage; the peer connection goes <code>failed</code></td><td>Nothing. It stays <code>failed</code> until the page calls <code>restartIce()</code> and a new offer/answer is exchanged.</td></tr>
+            <tr><td>WebSocket closes</td><td>Nothing. Browsers never reconnect a WebSocket.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2 id="code">5. What our code does</h2>
+      <p>There is no retry logic in the browser code or in the Durable Object.</p>
+
+      <h3>In <code>app/components/chat/Discussion.tsx</code></h3>
+      <ul>
+        <li><strong>Peer connection <code>failed</code>.</strong> The <code>connectionstatechange</code> listener sets <code>audioFailed</code>, which shows the red sentence. The flag is never cleared, and nothing is restarted.</li>
+        <li><strong>WebSocket <code>close</code>.</strong> The listener calls <code>end("error")</code>: the peer connection is closed, the microphone released, and the widget shows "The connection was lost." No new socket is opened.</li>
+        <li><strong>One publish per mount.</strong> <code>publish()</code> is guarded by the <code>publishing</code> flag, so the peer connection is built once and never rebuilt.</li>
+      </ul>
+
+      <h3>In <code>workers/discussions.ts</code></h3>
+      <ul>
+        <li><strong>A closed socket is a departure.</strong> <code>webSocketClose</code> and <code>webSocketError</code> both go to <code>left()</code>. With two participants that ends the conversation for the other one immediately; there is no grace period in which the first could come back.</li>
+        <li><strong>One publish per seat.</strong> <code>seat.publishing</code> is set on the first <code>publish</code> and never reset, so even a client that built a second peer connection would have its offer ignored.</li>
+        <li><strong>One seat per account.</strong> A second socket for a user who still has one open is turned away with <code>busy</code>.</li>
+        <li><strong>The cause of a close is discarded.</strong> <code>webSocketClose</code> does not log its close code, and <code>webSocketError</code> does not log its error. An abnormal drop leaves no trace on the server.</li>
+      </ul>
+
+      <h2 id="change">6. The change that was made</h2>
+      <p>
+        <code>silence()</code> no longer logs when the SFU answers <code>410</code>: that session is gone and
+        there is nothing to close. Every other failure is still logged. <code>sfu()</code> now throws an
+        <code>SfuError</code> that carries the HTTP status so the caller can tell the cases apart.
+      </p>
+      <pre><code>} catch (e) {
+  // The SFU let go of the session first: its connection dropped before
+  // the socket did, and there is nothing left to close.
+  if (e instanceof SfuError &amp;&amp; e.status === 410) return;
+  console.error("Closing the SFU tracks failed:", e);
+}</code></pre>
+      <div class="note warn">
+        <span class="eyebrow">Limits of this change</span>
+        <ul>
+          <li>It only quiets a log line. A dropped connection ends the conversation exactly as before.</li>
+          <li>It rests on the documentation, not on the incident: the status in the original error was not captured. If the line appears again, the status was something else and the full message will say what.</li>
+          <li>It typechecks. It has not been run against the real SFU.</li>
+        </ul>
+      </div>
+
+      <h2 id="unknown">7. What is not known</h2>
+      <ul>
+        <li><strong>Why B's socket closed.</strong> Nothing recorded the close code. A network drop or change, or a machine going to sleep, on B's side would fit, but none of these was observed.</li>
+        <li><strong>Which connection went first.</strong> The <code>410</code> reading says the audio did, at least 30 seconds earlier. Nobody reported the audio cutting out before the end, and nobody was asked.</li>
+        <li><strong>The status the SFU returned.</strong> See section 6.</li>
+        <li><strong>Whether the timing matters.</strong> With the end at 4:00, the offer of a second extension appears at 3:30, about when this happened. The extension code (<code>vote()</code>, <code>tally()</code>, the widget's extend button) was read and nothing in it closes a socket, so this is recorded as a coincidence, not a lead.</li>
+        <li><strong>Whether an ordinary "leave" can log the same line.</strong> Leaving closes the socket and the peer connection together, so the SFU may already consider the session closed when <code>silence()</code> asks about it. Not tested.</li>
+      </ul>
+      <p>
+        Logging the close code in <code>webSocketClose</code> and the error in <code>webSocketError</code> would
+        answer the first two the next time it happens. That has not been added.
+      </p>
+
+      <h2 id="retry">8. What a retry would take</h2>
+      <p>None of this is built. It is listed to show the size of the work, not as a plan.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>To survive</th><th>Browser</th><th>Durable Object</th></tr></thead>
+          <tbody>
+            <tr><td>A lost audio connection, within the SFU's 30-second window</td><td>On <code>failed</code>, call <code>restartIce()</code>, make a new offer and send it.</td><td>A new message type that passes the offer to the SFU for the same session. How the Realtime SFU expects an ICE restart to be signalled has not been checked.</td></tr>
+            <tr><td>A lost audio connection, after the window</td><td>Build a new peer connection, publish again, pull everyone again. Clear <code>audioFailed</code> and the old <code>voices</code>.</td><td>Allow a second <code>publish</code> on a seat: reset <code>publishing</code>, <code>live</code> and <code>pulled</code>, store the new session, close the old one. Tell the others, whose pulls of the old session are dead, to pull the new one.</td></tr>
+            <tr><td>A lost WebSocket</td><td>Open a new socket instead of ending, with a limit on attempts.</td><td>Keep the seat for a grace period instead of ending the conversation on the first close, and let the returning user take it back. Today the close is final and a conversation of two is deleted at once.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note warn">
+        <span class="eyebrow">About this file</span>
+        <p>
+          Everything in <code>public/</code> is deployed and readable by anyone at
+          <code>/discussion-connection-loss.html</code>. It contains no secrets, but it does describe the
+          internals. Also, <code>public/_headers</code> marks every static file as cacheable for a year, so a
+          browser that has loaded this page will not see later edits without a hard reload. Move it out of
+          <code>public/</code> before deploying if either matters.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>

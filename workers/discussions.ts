@@ -347,6 +347,9 @@ export class Discussions extends DurableObject<Env> {
         force: true,
       });
     } catch (e) {
+      // The SFU let go of the session first: its connection dropped before
+      // the socket did, and there is nothing left to close.
+      if (e instanceof SfuError && e.status === 410) return;
       console.error("Closing the SFU tracks failed:", e);
     }
   }
@@ -398,11 +401,21 @@ export class Discussions extends DurableObject<Env> {
       ? result
       : result.tracks?.find((track) => track.errorCode);
     if (!response.ok || failed) {
-      throw new Error(
+      throw new SfuError(
         `${method} ${path}: ${response.status} ${failed?.errorCode ?? ""} ${failed?.errorDescription ?? ""}`,
+        response.status,
       );
     }
     return result;
+  }
+}
+
+class SfuError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
   }
 }
 

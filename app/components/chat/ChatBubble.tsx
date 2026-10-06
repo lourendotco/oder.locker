@@ -51,19 +51,38 @@ export function ChatBubble({
   const emojisRef = useRef<HTMLButtonElement>(null);
   // Whether the bubble has been showing typing dots.
   const wasTyping = useRef(false);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  // How wide the bubble was with the typing dots in it.
+  const typingWidth = useRef(0);
 
   useLayoutEffect(() => {
+    const bubble = bubbleRef.current;
     if (typing) {
       wasTyping.current = true;
+      // The layout width: unlike the bounding box, .bubble-pop-in doesn't
+      // scale it.
+      typingWidth.current = bubble?.offsetWidth ?? 0;
       return;
     }
     if (!wasTyping.current) return;
     wasTyping.current = false;
 
-
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
       emojisRef.current?.animate({ opacity: [0, 1] }, { duration: 200 });
     } else {
+      // The text grows out of the dots: .bubble-pop-in again, from the size
+      // the bubble had, on the curve and duration app.css gives that class.
+      if (bubble?.offsetWidth) {
+        const { animationDuration, animationTimingFunction } =
+          getComputedStyle(bubble);
+        bubble.animate(
+          { scale: [typingWidth.current / bubble.offsetWidth, 1] },
+          {
+            duration: parseFloat(animationDuration) * 1000,
+            easing: animationTimingFunction,
+          },
+        );
+      }
       emojisRef.current?.animate(
         { scale: [0.4, 1], opacity: [0, 1] },
         { duration: EMOJIS_DURATION, easing: SPRING },
@@ -90,7 +109,8 @@ export function ChatBubble({
             unchanged). WebKit sizes the filter region from the filtered
             element's box, so anything hanging outside it loses its shadow. */}
         <div
-          className={`drop-shadow-md ${avatar ? "" : "ml-8.5"} ${hasEmojis ? "-mb-3.5 pb-3.5" : ""}`}
+          ref={bubbleRef}
+          className={`bubble-pop-in drop-shadow-md ${avatar ? "" : "ml-8.5"} ${hasEmojis ? "-mb-3.5 pb-3.5" : ""}`}
         >
           <div
             className={`relative rounded-xl bg-white text-black! ${bleed ? "" : `px-2.5 pt-1.5 ${hasEmojis ? "pb-4" : "pb-2"}`} text-sm text-white`}

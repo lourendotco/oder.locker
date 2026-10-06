@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
+<title>Accessibility audit – oder.locker (static code review)</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --surface: #ffffff;
+    --surface-2: #f1efeb;
+    --text: #1d1b19;
+    --muted: #57534d;
+    --border: #d6d1c9;
+    --accent: #5a32c2;
+    --code-bg: #efecf7;
+    --crit: #9b1c1c;   --crit-bg: #fdeaea;
+    --high: #9a3a06;   --high-bg: #fdeede;
+    --med: #6b5200;    --med-bg: #fbf3cf;
+    --low: #1f5a8a;    --low-bg: #e4f0fa;
+    --ok: #1c6b3a;     --ok-bg: #e3f4e9;
+    --manual: #5a32c2; --manual-bg: #ece6fb;
+    --focus: #1d1b19;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131317;
+      --surface: #1c1c22;
+      --surface-2: #25252d;
+      --text: #ececf1;
+      --muted: #b0afbb;
+      --border: #3d3d49;
+      --accent: #bca7ff;
+      --code-bg: #2a2838;
+      --crit: #ffb0b0;   --crit-bg: #461c1c;
+      --high: #ffc08f;   --high-bg: #45260f;
+      --med: #f1d877;    --med-bg: #3b320c;
+      --low: #a5d2f7;    --low-bg: #142f45;
+      --ok: #9be0b4;     --ok-bg: #143422;
+      --manual: #cdbdff; --manual-bg: #2e2550;
+      --focus: #ffffff;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: 1rem; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 1rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    overflow-wrap: break-word;
+  }
+  a { color: var(--accent); text-underline-offset: 0.18em; }
+  a:hover { text-decoration-thickness: 2px; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
+  .skip {
+    position: absolute; left: 0.75rem; top: -4rem;
+    background: var(--surface); color: var(--text);
+    padding: 0.6rem 1rem; border: 2px solid var(--focus); border-radius: 6px;
+    font-weight: 600; z-index: 10;
+  }
+  .skip:focus { top: 0.75rem; }
+  .wrap { max-width: 62rem; margin: 0 auto; padding: 0 1.25rem; }
+  header.page { padding: 2.5rem 0 1.5rem; border-bottom: 1px solid var(--border); }
+  h1 { font-size: clamp(1.6rem, 4vw, 2.3rem); line-height: 1.2; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.5rem; line-height: 1.25; margin: 3rem 0 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.2rem; margin: 2rem 0 0.75rem; }
+  h4 { font-size: 1.05rem; margin: 0; line-height: 1.35; }
+  p, ul, ol { margin: 0 0 1rem; }
+  li { margin-bottom: 0.35rem; }
+  .lede { font-size: 1.1rem; color: var(--muted); max-width: 46rem; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 0.5rem 1.5rem; margin: 1.25rem 0 0; padding: 0; }
+  .meta div { margin: 0; }
+  .meta dt { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .meta dd { margin: 0; font-weight: 600; }
+  nav.toc { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; margin: 1.5rem 0 0; }
+  nav.toc h2 { font-size: 1rem; margin: 0 0 0.5rem; padding: 0; border: 0; }
+  nav.toc ol { margin: 0; padding-left: 1.25rem; columns: 2 16rem; column-gap: 2rem; }
+  nav.toc a { display: inline-block; padding: 0.15rem 0; }
+  code, kbd {
+    font: 0.88em/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px;
+  }
+  kbd { border: 1px solid var(--border); }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); gap: 0.75rem; padding: 0; margin: 1rem 0 1.5rem; list-style: none; }
+  .cards li { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; margin: 0; }
+  .cards .n { display: block; font-size: 1.9rem; font-weight: 700; line-height: 1.1; }
+  .cards .l { font-size: 0.9rem; color: var(--muted); }
+  .tag {
+    display: inline-block; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.02em;
+    padding: 0.15rem 0.55rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap;
+  }
+  .t-crit { color: var(--crit); background: var(--crit-bg); }
+  .t-high { color: var(--high); background: var(--high-bg); }
+  .t-med { color: var(--med); background: var(--med-bg); }
+  .t-low { color: var(--low); background: var(--low-bg); }
+  .t-ok { color: var(--ok); background: var(--ok-bg); }
+  .t-manual { color: var(--manual); background: var(--manual-bg); }
+  .tags { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0; }
+  .finding, .qa { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.1rem 1.25rem; margin: 0 0 1.1rem; }
+  .finding { border-left-width: 6px; }
+  .finding.high { border-left-color: var(--high); }
+  .finding.med { border-left-color: var(--med); }
+  .finding.low { border-left-color: var(--low); }
+  .fid { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-right: 0.4rem; color: var(--muted); }
+  .finding dl { display: grid; grid-template-columns: 10.5rem 1fr; gap: 0.6rem 1rem; margin: 1rem 0 0; }
+  .finding dt { font-weight: 700; font-size: 0.9rem; color: var(--muted); }
+  .finding dd { margin: 0; min-width: 0; }
+  .finding dd > :last-child { margin-bottom: 0; }
+  .finding dd ul, .finding dd ol { padding-left: 1.15rem; }
+  @media (max-width: 40rem) {
+    .finding dl { grid-template-columns: 1fr; gap: 0.15rem; }
+    .finding dd { margin-bottom: 0.7rem; }
+  }
+  .qa h3 { margin: 0 0 0.5rem; font-size: 1.08rem; }
+  .qa > :last-child { margin-bottom: 0; }
+  .answer { font-weight: 600; }
+  .note { background: var(--surface-2); border-left: 4px solid var(--accent); padding: 0.8rem 1rem; border-radius: 0 8px 8px 0; margin: 0 0 1rem; }
+  .note > :last-child { margin-bottom: 0; }
+  .scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; margin: 0 0 1.25rem; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+  caption { text-align: left; font-weight: 700; padding: 0.75rem 0.9rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.9rem; border-top: 1px solid var(--border); }
+  thead th { background: var(--surface-2); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sw { display: inline-block; width: 0.9em; height: 0.9em; border-radius: 3px; border: 1px solid var(--border); vertical-align: -0.08em; margin-right: 0.3em; }
+  .check { list-style: none; padding: 0; }
+  .check li { margin: 0 0 0.3rem; }
+  .check label { display: flex; gap: 0.7rem; align-items: flex-start; padding: 0.4rem 0.5rem; border-radius: 6px; cursor: pointer; }
+  .check label:hover { background: var(--surface-2); }
+  .check input { width: 1.2rem; height: 1.2rem; margin: 0.2rem 0 0; flex: none; accent-color: var(--accent); }
+  .check input:checked + span { color: var(--muted); text-decoration: line-through; }
+  button.plain {
+    font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0.45rem 0.9rem; cursor: pointer; min-height: 2.5rem;
+  }
+  button.plain:hover { background: var(--surface-2); }
+  footer.page { margin: 3rem 0 0; padding: 1.5rem 0 3rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.9rem; }
+  @media print {
+    .skip, nav.toc, button.plain { display: none; }
+    body { background: #fff; color: #000; }
+    .finding, .qa { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<header class="page">
+  <div class="wrap">
+    <h1>Accessibility audit: oder.locker</h1>
+    <p class="lede">A static review of the source code against WCAG 2.2 Level AA, with an in-depth look at what happens to focus, titles and announcements when the route changes. Nothing was run: every conclusion comes from reading the code.</p>
+    <dl class="meta">
+      <div><dt>Date</dt><dd>7 October 2026</dd></div>
+      <div><dt>Standard</dt><dd>WCAG 2.2 AA</dd></div>
+      <div><dt>Method</dt><dd>Source inspection only</dd></div>
+      <div><dt>Code reviewed</dt><dd>Working tree at <code>cba3dc0</code>, plus uncommitted changes in <code>Discussion.tsx</code>, <code>ChatBubble.tsx</code> and <code>app.css</code></dd></div>
+    </dl>
+    <nav class="toc" aria-labelledby="toc-h">
+      <h2 id="toc-h">Contents</h2>
+      <ol>
+        <li><a href="#summary">Executive summary</a></li>
+        <li><a href="#how-to-read">How to read this report</a></li>
+        <li><a href="#routes">Route-change accessibility</a></li>
+        <li><a href="#findings">Findings by severity</a></li>
+        <li><a href="#contrast">Colour contrast measurements</a></li>
+        <li><a href="#motion">Animation and reduced motion</a></li>
+        <li><a href="#good">Already implemented correctly</a></li>
+        <li><a href="#quick">Quick wins (under an hour)</a></li>
+        <li><a href="#plan">Prioritised remediation plan</a></li>
+        <li><a href="#checklist">Manual-testing checklist</a></li>
+        <li><a href="#limits">Limitations</a></li>
+      </ol>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+<div class="wrap">
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="summary">Executive summary</h2>
+
+  <p>The application is in better shape than most at this stage. Accessibility has clearly been considered while writing it: there is a skip link, real landmarks, one <code>&lt;h1&gt;</code> per page, labelled form fields, a native modal <code>&lt;dialog&gt;</code>, language markup on German quotations, a reduced-motion fallback for every CSS animation, and deliberate focus management after client-side navigation.</p>
+
+  <p>No critical (blocking) issue was confirmed from the source. Three high-severity issues were:</p>
+  <ol>
+    <li><strong>The two brand colours fail text contrast.</strong> White on the purple measures 3.86:1 and white on the orange 3.05:1, against a required 4.5:1. This affects every form field, every primary button, the sign-in headings and the conversation timer.</li>
+    <li><strong>The desktop “phone frame” shrinks when the window is short or zoomed.</strong> Above 640&nbsp;px wide the frame's width is derived from the window height, so at 200% zoom on a 1280×720 window it works out to about 180&nbsp;px, narrower than the 320&nbsp;px form fields inside it.</li>
+    <li><strong>A screen-reader user is not told when a voice conversation starts.</strong> The “looking for someone” status is replaced by the live conversation view, which has no live region, so the participant's name, the timer and the suggested questions arrive silently.</li>
+  </ol>
+
+  <ul class="cards">
+    <li><span class="n">0</span><span class="l">Critical</span></li>
+    <li><span class="n">3</span><span class="l">High</span></li>
+    <li><span class="n">10</span><span class="l">Medium</span></li>
+    <li><span class="n">12</span><span class="l">Low</span></li>
+  </ul>
+
+  <p><strong>On route changes:</strong> the app runs React Router 8.4.0 in framework mode with server rendering. React Router itself does nothing for focus or announcements, but the app adds its own handling in <code>Shell.tsx</code>, which moves focus to <code>&lt;main&gt;</code> whenever the pathname changes. Page titles are set per route, but nothing announces them: there is no route announcer and no <code>aria-live</code> region tied to navigation. What a screen reader actually says when focus lands on the unnamed <code>&lt;main&gt;</code> varies by product and requires manual verification. Details are in <a href="#routes">Route-change accessibility</a>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="how-to-read">How to read this report</h2>
+  <p>Every finding carries one of two evidence labels:</p>
+  <ul>
+    <li><span class="tag t-ok">Confirmed in source</span> The defect is visible in the code itself (a missing attribute, a computed colour ratio, a code path that never moves focus). No runtime result is implied.</li>
+    <li><span class="tag t-manual">Requires manual verification</span> The code suggests a problem, but whether users are affected depends on browser, assistive technology or layout behaviour that cannot be established by reading.</li>
+  </ul>
+  <p>Some findings carry both: the code fact is confirmed, its effect on users is not. Line numbers refer to the working tree on the audit date.</p>
+  <div class="scroll" role="region" aria-label="Severity definitions" tabindex="0">
+    <table>
+      <caption>Severity definitions used here</caption>
+      <thead><tr><th scope="col">Severity</th><th scope="col">Meaning</th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><span class="tag t-crit">Critical</span></th><td>Blocks a group of users from completing a core task, with no workaround.</td></tr>
+        <tr><th scope="row"><span class="tag t-high">High</span></th><td>A clear WCAG AA failure on a core path, or a serious barrier with only an awkward workaround.</td></tr>
+        <tr><th scope="row"><span class="tag t-med">Medium</span></th><td>A WCAG failure or likely failure with limited scope, or one that depends on assistive-technology behaviour.</td></tr>
+        <tr><th scope="row"><span class="tag t-low">Low</span></th><td>Minor, latent or advisory. Worth fixing when nearby code is touched.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="routes">Route-change accessibility</h2>
+
+  <h3>Direct answers</h3>
+
+  <div class="qa">
+    <h3>1. Which React Router version and routing architecture?</h3>
+    <p class="answer">React Router 8.4.0, framework mode, server-side rendered on Cloudflare Workers.</p>
+    <ul>
+      <li><code>package.json:22</code> declares <code>"react-router": "^8.4.0"</code>; the installed package is exactly 8.4.0, as is <code>@react-router/dev</code>. React is 19.3.0 installed (<code>^19.2.8</code> declared).</li>
+      <li>Framework mode: the <code>reactRouter()</code> Vite plugin (<code>vite.config.ts:10</code>), a route config file (<code>app/routes.ts</code>), route modules exporting <code>loader</code>, <code>action</code>, <code>meta</code> and <code>links</code>.</li>
+      <li><code>react-router.config.ts:6</code> sets <code>ssr: true</code>. No <code>future</code> flags are set.</li>
+      <li>The server is a Worker calling <code>createRequestHandler</code> (<code>workers/app.ts:7-10</code>).</li>
+      <li>There is no <code>app/entry.client.tsx</code>, so the framework default is used: <code>hydrateRoot(document, &lt;HydratedRouter /&gt;)</code> inside <code>startTransition</code> and <code>StrictMode</code>.</li>
+    </ul>
+    <p>Route tree (<code>app/routes.ts:8-16</code>):</p>
+    <ul>
+      <li><code>root.tsx</code>: the HTML document; its component is a bare <code>&lt;Outlet /&gt;</code> (<code>root.tsx:36-38</code>)
+        <ul>
+          <li><code>routes/layout.tsx</code>: a pathless layout that renders <code>&lt;Shell&gt;&lt;Outlet /&gt;&lt;/Shell&gt;</code> (<code>layout.tsx:37-41</code>)
+            <ul>
+              <li><code>/</code> → <code>home.tsx</code> (sign-in, three steps)</li>
+              <li><code>/theme</code> → <code>theme.tsx</code></li>
+              <li><code>/profile</code> → <code>profile.tsx</code></li>
+              <li><code>/weeks</code> → <code>weeks.tsx</code></li>
+              <li><code>/privacy</code> → <code>privacy.tsx</code></li>
+            </ul>
+          </li>
+          <li><code>/logout</code> → <code>logout.tsx</code>: action only, outside the layout, no component</li>
+        </ul>
+      </li>
+    </ul>
+    <p>Nesting is one level deep. Every visible page is a leaf under the same layout, so <code>Shell</code>, the header and <code>&lt;main&gt;</code> stay mounted across navigations and only the content of the inner <code>&lt;Outlet&gt;</code> is swapped.</p>
+  </div>
+
+  <div class="qa">
+    <h3>2. What does React Router do by default when the rendered <code>&lt;Outlet&gt;</code> changes?</h3>
+    <p class="answer">It swaps the element, updates the document head, and resets window scroll. It does not touch focus and announces nothing.</p>
+    <p>Read from the installed 8.4.0 build in <code>node_modules/react-router/dist/development</code>:</p>
+    <ul>
+      <li><strong>Rendering.</strong> <code>Outlet</code> just returns <code>useOutlet()</code> (<code>lib/components.js:466-468</code>): the old route element unmounts and the new one mounts. Router state updates are wrapped in <code>React.startTransition</code> (<code>lib/components.js:147, 387</code>).</li>
+      <li><strong>Title.</strong> <code>&lt;Meta /&gt;</code> re-runs the matched routes' <code>meta</code> functions and renders a new <code>&lt;title&gt;</code> element (<code>lib/dom/ssr/components.js:347</code> onwards). The title changes; nothing reads it out.</li>
+      <li><strong>Scroll.</strong> <code>&lt;ScrollRestoration /&gt;</code> restores a saved position on back/forward, scrolls to a matching hash target, or otherwise calls <code>window.scrollTo(0, 0)</code> (<code>lib/dom/lib.js:1111-1129</code>).</li>
+      <li><strong>Focus.</strong> A search of both the development and production builds finds no call to <code>.focus()</code> and no read of <code>document.activeElement</code>. Focus is left wherever the browser leaves it: on the followed link if it still exists, otherwise on <code>&lt;body&gt;</code>.</li>
+      <li><strong>Announcements.</strong> The same search finds no <code>aria-live</code>, no <code>role="status"</code> and no assignment to <code>document.title</code>. React Router 8.4.0 ships no route announcer.</li>
+    </ul>
+    <p>View transitions are opt-in per navigation (the <code>viewTransition</code> prop or option). This app never passes it; its slide animation comes from React's own <code>&lt;ViewTransition&gt;</code> in <code>PageTransition.tsx</code>.</p>
+  </div>
+
+  <div class="qa">
+    <h3>3. Does this application deliberately move focus after navigation?</h3>
+    <p class="answer">Yes. <code>Shell.tsx:14-20</code> focuses <code>&lt;main&gt;</code> when the pathname changes.</p>
+    <p>The effect compares the current <code>pathname</code> from <code>useLocation()</code> with the previous one. When they differ, and focus is not already inside <code>&lt;main&gt;</code>, it calls <code>main.focus({ preventScroll: true })</code>. <code>&lt;main&gt;</code> has <code>tabIndex={-1}</code> and <code>outline-none</code> (<code>Shell.tsx:48-53</code>). The code comment states the intent: do not leave focus on the followed link or nowhere, and do not steal it from a page that used <code>autoFocus</code>.</p>
+    <p>What follows from the code:</p>
+    <ul>
+      <li>It covers link clicks, back/forward, and redirects that end on a different pathname, including the sign-in redirect to <code>/theme</code>.</li>
+      <li>It is keyed on pathname only. A change of search string alone does not move focus. That is reasonable here, since <code>?next=</code> is the only query parameter in use.</li>
+      <li>It does not run on full document loads: first visit, and sign-out, which uses <code>redirectDocument</code> (<code>logout.tsx:10</code>). The browser's own page-load behaviour applies there, which is correct.</li>
+      <li>It does not run when the root <code>ErrorBoundary</code> takes over, because that renders a second, freshly mounted <code>Shell</code> whose “previous pathname” starts equal to the current one (<a href="#l5">finding L5</a>).</li>
+      <li>It does not cover step changes inside <code>/</code> (email → code → sign-up), which happen without a URL change. The code and sign-up steps handle this with <code>autoFocus</code>; going back to the email step does not (<a href="#m2">finding M2</a>).</li>
+      <li><code>&lt;main&gt;</code> has no accessible name, and no visible focus indicator when focused this way (<a href="#m1">finding M1</a>).</li>
+    </ul>
+    <p><span class="tag t-manual">Requires manual verification</span> Whether the effect fires at the right moment relative to the view transition, and what each screen reader says when focus lands on <code>&lt;main&gt;</code>.</p>
+  </div>
+
+  <div class="qa">
+    <h3>4. Are route changes or title changes announced through an <code>aria-live</code> region?</h3>
+    <p class="answer">No.</p>
+    <p>Every live region in the application was located. None relates to navigation:</p>
+    <ul>
+      <li><code>theme.tsx:250</code> and <code>theme.tsx:385</code>: <code>aria-live="polite"</code> around chat content.</li>
+      <li><code>ChatBubble.tsx:200</code>: <code>aria-live="off"</code> on the emoji picker.</li>
+      <li><code>home.tsx:291, 326, 369, 475</code>: <code>role="alert"</code> for form errors; <code>home.tsx:375</code>: <code>role="status"</code> for “requested a new code”.</li>
+      <li><code>Discussion.tsx:305, 345, 416</code>: <code>role="status"</code>; <code>:332</code>: <code>role="alert"</code>; <code>:324</code>: <code>role="timer"</code>.</li>
+    </ul>
+    <p>The <code>Shell</code> component and both layout files contain no live region, and the framework supplies none. The only signal a screen-reader user gets on navigation is whatever their screen reader says when focus moves to <code>&lt;main&gt;</code>.</p>
+  </div>
+
+  <h3>What was inspected</h3>
+  <div class="scroll" role="region" aria-label="Navigation mechanisms inspected" tabindex="0">
+    <table>
+      <caption>Navigation mechanisms in the codebase</caption>
+      <thead><tr><th scope="col">Mechanism</th><th scope="col">Where</th><th scope="col">What the code does</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Normal links</th>
+          <td><code>Header.tsx:42, 48, 52</code><br><code>home.tsx:430, 488</code><br><code>weeks.tsx:25</code></td>
+          <td>Plain <code>&lt;Link to&gt;</code>. No <code>viewTransition</code>, <code>prefetch</code>, <code>reloadDocument</code> or <code>preventScrollReset</code> props anywhere. No <code>NavLink</code>, so there is no <code>aria-current</code> on the header links.</td>
+        </tr>
+        <tr>
+          <th scope="row">External links</th>
+          <td><code>privacy.tsx:23-31</code><br><code>ChatBubble.tsx:168-192</code></td>
+          <td>Native <code>&lt;a target="_blank"&gt;</code> with visually hidden “(opens in a new tab)” text. Not router navigations.</td>
+        </tr>
+        <tr>
+          <th scope="row">Nested routes</th>
+          <td><code>routes.ts:9-15</code><br><code>layout.tsx:37-41</code></td>
+          <td>One pathless layout, five leaves. <code>Shell</code> persists; the leaf is replaced.</td>
+        </tr>
+        <tr>
+          <th scope="row">Programmatic navigation</th>
+          <td>none</td>
+          <td>No <code>useNavigate</code>, <code>&lt;Navigate&gt;</code> or <code>useSubmit</code> in the app.</td>
+        </tr>
+        <tr>
+          <th scope="row">Server redirects</th>
+          <td><code>home.tsx:32, 97, 113, 129</code><br><code>session.server.ts:70</code></td>
+          <td><code>redirect()</code> from loaders and from the sign-in action. On the client these resolve as router navigations; the pathname changes, so the <code>Shell</code> effect fires.</td>
+        </tr>
+        <tr>
+          <th scope="row">Document redirect</th>
+          <td><code>logout.tsx:10</code><br><code>profile.tsx:75</code></td>
+          <td><code>&lt;Form method="post" action="/logout"&gt;</code> answered with <code>redirectDocument("/")</code>: a full page load.</td>
+        </tr>
+        <tr>
+          <th scope="row">Fetcher forms</th>
+          <td><code>home.tsx:230, 336, 385, 436</code></td>
+          <td><code>fetcher.Form</code> for all sign-in steps. Step changes re-render in place with no navigation.</td>
+        </tr>
+        <tr>
+          <th scope="row">History API</th>
+          <td><code>home.tsx:210</code></td>
+          <td><code>history.replaceState</code> strips the email from the URL fragment, bypassing the router. Pathname is unchanged, so nothing else reacts.</td>
+        </tr>
+        <tr>
+          <th scope="row">Title management</th>
+          <td><code>home.tsx:27</code>, <code>theme.tsx:18</code>, <code>profile.tsx:8</code>, <code>weeks.tsx:12</code>, <code>privacy.tsx:3</code>, <code>root.tsx:60</code></td>
+          <td>Each page route exports <code>meta</code> with a distinct title; the error boundary renders a React 19 <code>&lt;title&gt;</code>. <code>/logout</code> has none.</td>
+        </tr>
+        <tr>
+          <th scope="row">Page transition</th>
+          <td><code>PageTransition.tsx:8-20</code><br><code>app.css:22-40</code></td>
+          <td>Slide-in on push/replace only, none on back/forward or first load; disabled under reduced motion. <code>privacy.tsx</code> and <code>home.tsx</code> do not use it.</td>
+        </tr>
+        <tr>
+          <th scope="row">Focus utilities</th>
+          <td><code>Shell.tsx:14-20, 37-46</code><br><code>Discussion.tsx:114-125, 367</code><br><code>ChatBubble.tsx:206, 214</code></td>
+          <td>Focus is handled inline where needed. There is no shared focus helper and no announcer module. <code>lib/scroll.ts</code> handles scrolling only.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Walk-through of each navigation, from the code</h3>
+  <div class="scroll" role="region" aria-label="Expected focus and title per navigation" tabindex="0">
+    <table>
+      <caption>What the source implies for each navigation (not observed at runtime)</caption>
+      <thead><tr><th scope="col">Navigation</th><th scope="col">Type</th><th scope="col">Focus ends on</th><th scope="col">Title becomes</th></tr></thead>
+      <tbody>
+        <tr><td>Header avatar → <code>/profile</code></td><td>Client</td><td><code>&lt;main&gt;</code></td><td>oder.locker - your profile</td></tr>
+        <tr><td>Header clock → <code>/weeks</code></td><td>Client</td><td><code>&lt;main&gt;</code></td><td>oder.locker - previous weeks</td></tr>
+        <tr><td>Weeks list item → <code>/theme</code></td><td>Client</td><td><code>&lt;main&gt;</code></td><td>oder.locker - this week</td></tr>
+        <tr><td>“Privacy” on sign-in → <code>/privacy</code></td><td>Client</td><td><code>&lt;main&gt;</code></td><td>oder.locker - privacy</td></tr>
+        <tr><td>Sign-in succeeds → <code>/theme</code></td><td>Client redirect</td><td><code>&lt;main&gt;</code></td><td>oder.locker - this week</td></tr>
+        <tr><td>Header logo while signed in on <code>/theme</code></td><td>Client redirect back to <code>/theme</code></td><td>Stays on the logo link (pathname unchanged)</td><td>Unchanged</td></tr>
+        <tr><td>Email → code step</td><td>In-page</td><td>Code input (<code>autoFocus</code>)</td><td>Unchanged: oder.locker</td></tr>
+        <tr><td>Code → email step (“use another email”)</td><td>In-page</td><td>Lost: the button unmounts</td><td>Unchanged</td></tr>
+        <tr><td>Sign out</td><td>Full page load</td><td>Browser default</td><td>oder.locker</td></tr>
+        <tr><td>Route error or 404 reached client-side</td><td>Client</td><td>Not moved</td><td>oder.locker - 404 / Error</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <p><strong>Assessment.</strong> The focus handling is a sound baseline and already ahead of the framework default. The gap is the announcement: focus lands on a container with no name, so the user learns that something changed but not what. The smallest robust fix is to focus the new page's <code>&lt;h1&gt;</code> instead of <code>&lt;main&gt;</code>, or to give <code>&lt;main&gt;</code> an <code>aria-labelledby</code> pointing at it. See <a href="#m1">M1</a>.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="findings">Findings by severity</h2>
+
+  <h3 id="sev-critical"><span class="tag t-crit">Critical</span> None confirmed</h3>
+  <p>No issue was found in the source that would, on its own, block a group of users from signing in, reading the weekly topic or adding voices. This is a statement about the code, not a test result: the manual checklist below could still surface one, most plausibly in the third-party pieces (Cloudflare Turnstile, the emoji picker, the lightbox).</p>
+
+  <!-- ---------------- HIGH ---------------- -->
+  <h3 id="sev-high"><span class="tag t-high">High</span> 3 findings</h3>
+
+  <article class="finding high" id="h1">
+    <h4><span class="fid">H1</span>Brand colours fail text contrast on fields, buttons, headings and the timer</h4>
+    <p class="tags"><span class="tag t-high">High</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.4.3 Contrast (Minimum), AA</dd>
+      <dt>Affected</dt><dd><code>/</code> (all three steps), <code>/theme</code> voices dialog, <code>Discussion</code> widget</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <p>Tokens: <code>--color-primary: #f7661e</code>, <code>--color-secondary: rgb(148, 102, 242)</code> (<code>app.css:7-8</code>). None of the text below is “large” in WCAG terms (18&nbsp;px at weight 500 is not), so 4.5:1 applies.</p>
+        <ul>
+          <li><code>home.tsx:144</code> field text: white on secondary, <strong>3.86:1</strong>.</li>
+          <li><code>home.tsx:144</code> placeholder: <code>white/70</code> on secondary, <strong>2.69:1</strong>. The placeholder is the only visible label (see <a href="#m3">M3</a>).</li>
+          <li><code>home.tsx:146</code> submit buttons: white on primary, <strong>3.05:1</strong>; on hover (<code>bg-primary/85</code>) about <strong>2.67:1</strong>.</li>
+          <li><code>home.tsx:250, 345, 444</code> step headings: secondary on <code>neutral-100</code>, <strong>3.54:1</strong>.</li>
+          <li><code>Discussion.tsx:325</code> timer: secondary on white 3.86:1, switching to primary on white <strong>3.05:1</strong> for the last 30 seconds.</li>
+          <li><code>Discussion.tsx:369</code> “Extend”: 14&nbsp;px white on primary, 3.05:1.</li>
+          <li><code>theme.tsx:511, 522</code> “Discuss with another user”: 14&nbsp;px white on primary, 3.05:1.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>People with low vision or reduced contrast sensitivity, and anyone on a phone in daylight, will struggle to read what they typed into the sign-in fields, the button labels and the countdown. The timer is hardest to read exactly when it matters most.</dd>
+      <dt>Recommended fix</dt>
+      <dd>
+        <p>Add darker “on-colour” variants and use them wherever the colour carries text or sits behind white text. For example, <code>#7443e0</code> gives 5.80:1 with white and 5.32:1 on <code>neutral-100</code>; <code>#b93f0b</code> gives 5.56:1 and 5.10:1. Keep the current brighter values for the logo and decoration. Either raise the placeholder to full white or stop relying on it as the label.</p>
+      </dd>
+      <dt>Manual verification</dt><dd>Check each listed element with a contrast picker in the browser, including hover and disabled states. Confirm the rendered font weight and size match the classes.</dd>
+    </dl>
+  </article>
+
+  <article class="finding high" id="h2">
+    <h4><span class="fid">H2</span>Desktop phone frame takes its width from the window height, so it collapses under zoom</h4>
+    <p class="tags"><span class="tag t-high">High</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.4.4 Resize Text, AA; 1.4.10 Reflow, AA</dd>
+      <dt>Affected</dt><dd>Every route, at viewport widths of 640&nbsp;px and above (<code>Shell</code>)</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Shell.tsx:23</code>: from the <code>sm</code> breakpoint the outer box is <code>h-screen</code> with <code>py-5</code>.</li>
+          <li><code>Shell.tsx:33</code>: the frame is <code>h-full sm:aspect-9/16 sm:w-auto max-w-sm</code>. Its width is therefore (viewport height − 40&nbsp;px) × 9/16, capped at 384&nbsp;px.</li>
+          <li><code>Shell.tsx:34</code>: the inner scroller is <code>sm:overflow-auto sm:scrollbar-none</code>: it scrolls in both directions with scrollbars hidden.</li>
+          <li><code>home.tsx:144, 146, 151</code>: fields, buttons and messages are a fixed <code>w-80</code> (320&nbsp;px).</li>
+        </ul>
+        <p>Worked from those classes: a 1280×720 window at 200% zoom is 640×360 CSS px, which still matches <code>sm</code>, giving a frame about 180&nbsp;px wide. A 1366×768 window at 150% gives about 265&nbsp;px. A phone in landscape (for example 844×390) gives about 197&nbsp;px. In each case the content is wider than the frame.</p>
+      </dd>
+      <dt>User impact</dt><dd>People who zoom on a laptop get a narrower page the more they zoom, the opposite of what zoom is for. Content is cut off or needs two-dimensional scrolling inside a region with no visible scrollbar.</dd>
+      <dt>Recommended fix</dt><dd>Only apply the framed layout when there is room for it, for example with a combined query such as <code>@media (min-width: 40rem) and (min-height: 44rem)</code>, and fall back to the full-width mobile layout otherwise. Give the frame a <code>min-width</code> of 20&nbsp;rem, and replace <code>w-80</code> with <code>w-full max-w-80</code>.</dd>
+      <dt>Manual verification</dt><dd>At 1280×720 and 1366×768, zoom to 150%, 200% and 400% on <code>/</code> and <code>/theme</code>. Rotate a phone to landscape. Look for clipped fields and horizontal scrolling. The widths above are derived from the CSS, not measured.</dd>
+    </dl>
+  </article>
+
+  <article class="finding high" id="h3">
+    <h4><span class="fid">H3</span>The start of a voice conversation is not announced</h4>
+    <p class="tags"><span class="tag t-high">High</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>4.1.3 Status Messages, AA</dd>
+      <dt>Affected</dt><dd><code>/theme</code>, <code>Discussion</code> widget</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Discussion.tsx:416</code>: the microphone and searching states sit in a <code>role="status"</code> container.</li>
+          <li><code>Discussion.tsx:308-309</code>: when a match arrives, that container is unmounted and replaced by a plain <code>&lt;div&gt;</code> with the participants, timer and questions. Nothing in it is a live region except the conditional extend prompt and audio error.</li>
+          <li><code>Discussion.tsx:121-125</code>: if focus was on “stop looking”, it is returned to the <code>&lt;section aria-label="Discussion"&gt;</code>, whose name does not change.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>A blind user who starts a search hears “Looking for someone to discuss with…”, then a stranger's voice with no introduction. They are not told who joined, that a three-minute timer is running, or that there are suggested questions.</dd>
+      <dt>Recommended fix</dt><dd>Keep one status element mounted for the widget's whole life and write each transition into it: “Connected with Louise. Three minutes. Suggested questions follow.” The same element can carry the end-of-conversation message and the extend prompt (see <a href="#m5">M5</a>).</dd>
+      <dt>Manual verification</dt><dd>With two accounts and a screen reader running on one, start a discussion on both. Note exactly what is spoken at the moment of connection, and whether the participant's name can be found afterwards without sight.</dd>
+    </dl>
+  </article>
+
+  <!-- ---------------- MEDIUM ---------------- -->
+  <h3 id="sev-medium"><span class="tag t-med">Medium</span> 10 findings</h3>
+
+  <article class="finding med" id="m1">
+    <h4><span class="fid">M1</span>After navigation, focus lands on an unnamed <code>&lt;main&gt;</code> and the new page is not announced</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>4.1.3 Status Messages, AA (by analogy; a full page change is a change of context); supports 2.4.3 Focus Order, A. 2.4.2 Page Titled is met.</dd>
+      <dt>Affected</dt><dd>All client-side navigations (<code>Shell</code>)</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Shell.tsx:14-20</code>: focus is moved to <code>&lt;main&gt;</code> on pathname change.</li>
+          <li><code>Shell.tsx:48-53</code>: <code>&lt;main id="main" tabIndex={-1} className="… outline-none"&gt;</code>, with no <code>aria-label</code> or <code>aria-labelledby</code>.</li>
+          <li>No live region for navigation exists anywhere (see <a href="#routes">question 4</a>).</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>A screen-reader user is likely to hear only “main” after following a link, with no page name. Screen readers differ here, and some may begin reading content. Sighted keyboard users get no visible sign of where focus went, though the page change itself is obvious.</dd>
+      <dt>Recommended fix</dt>
+      <dd>Either of these, both small:
+        <ul>
+          <li>Give each page's <code>&lt;h1&gt;</code> a shared id and set <code>aria-labelledby</code> on <code>&lt;main&gt;</code>, so focusing it speaks the heading; or</li>
+          <li>Focus the <code>&lt;h1&gt;</code> itself (<code>tabIndex={-1}</code>) instead of <code>&lt;main&gt;</code>.</li>
+        </ul>
+        Optionally add a visually hidden <code>role="status"</code> element in <code>Shell</code> that receives <code>document.title</code> after each navigation.
+      </dd>
+      <dt>Manual verification</dt><dd>With VoiceOver (Safari), NVDA (Firefox and Chrome) and TalkBack, follow each header link and note the exact speech. Repeat with the browser's back button.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m2">
+    <h4><span class="fid">M2</span>Focus is lost when a button removes itself during sign-in</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.4.3 Focus Order, A</dd>
+      <dt>Affected</dt><dd><code>/</code>, code step and sign-up step</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>home.tsx:415-425</code> “use another email”: the click switches to the email form, unmounting the button. The email input (<code>home.tsx:451-468</code>) has no <code>autoFocus</code>, and the <code>Shell</code> effect does not run because the pathname is unchanged.</li>
+          <li><code>home.tsx:279-285</code> “remove picture”: the button is replaced by plain text when clicked.</li>
+        </ul>
+        <p>The app already handles this pattern correctly elsewhere (<code>Discussion.tsx:367</code>).</p>
+      </dd>
+      <dt>User impact</dt><dd>Keyboard users are returned to the top of the document and must tab through the header again. Screen-reader users lose their place with no announcement.</dd>
+      <dt>Recommended fix</dt><dd>On “use another email”, focus the email input (a ref, or <code>autoFocus</code> when the step was reached by going back). On “remove picture”, move focus to the file input.</dd>
+      <dt>Manual verification</dt><dd>Activate each button with <kbd>Enter</kbd>, then press <kbd>Tab</kbd> once and see where focus goes.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m3">
+    <h4><span class="fid">M3</span>Placeholders are the only visible field labels</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>3.3.2 Labels or Instructions, A</dd>
+      <dt>Affected</dt><dd><code>/</code>, all steps</dd>
+      <dt>Evidence</dt><dd><code>home.tsx:295-297, 313-315, 350-352, 448-450</code>: every <code>&lt;label&gt;</code> is <code>sr-only</code>. The visible cue is the placeholder (<code>home.tsx:308, 322, 363, 461</code>), which disappears on input. The sign-up step has two adjacent fields, “username” and “name (optional)”.</dd>
+      <dt>User impact</dt><dd>Once a field has content, nothing on screen says what it is. This is hardest on people with memory or attention difficulties and on anyone reviewing an autofilled form. Voice-control users cannot see a label to speak.</dd>
+      <dt>Recommended fix</dt><dd>Show the labels: a small label above each field, or a floating label that stays visible when the field has a value.</dd>
+      <dt>Manual verification</dt><dd>Fill both sign-up fields and check whether each can still be identified by sight. With voice control, try “click username”.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m4">
+    <h4><span class="fid">M4</span>“continue” is disabled with no explanation while bot verification is pending or has failed</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>4.1.3 Status Messages, AA; 3.3.1 Error Identification, A</dd>
+      <dt>Affected</dt><dd><code>/</code>, email step; <code>Turnstile</code></dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>home.tsx:481</code>: <code>disabled={!turnstileToken || busy}</code>.</li>
+          <li><code>Turnstile.tsx:86-93</code>: only <code>callback</code> and <code>expired-callback</code> are registered. There is no <code>error-callback</code>, <code>timeout-callback</code> or <code>unsupported-callback</code>, and nothing handles the script failing to load (<code>Turnstile.tsx:29-45</code>).</li>
+          <li><code>home.tsx:330, 380, 409</code>: while a submission is in flight, buttons are disabled with no text change, <code>aria-busy</code> or status message.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>If verification is slow, blocked by a content blocker, or needs an interactive challenge, the only button on the page is disabled and nothing says why. A disabled button is also skipped by <kbd>Tab</kbd>, so a keyboard user may not find it at all.</dd>
+      <dt>Recommended fix</dt><dd>Handle the error and timeout callbacks and show a message with <code>role="alert"</code>. Consider keeping the button enabled and validating on submit. Add a polite “Checking…” or “Sending…” status while busy.</dd>
+      <dt>Manual verification</dt><dd>Load <code>/</code> with <code>challenges.cloudflare.com</code> blocked. Throttle the network and submit. Test the Turnstile widget itself with keyboard and a screen reader when it shows an interactive challenge; it is third-party and could not be reviewed here.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m5">
+    <h4><span class="fid">M5</span>Status messages are inserted together with their live region, and repeated errors are silent</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>4.1.3 Status Messages, AA</dd>
+      <dt>Affected</dt><dd><code>Discussion</code> widget; <code>/</code></dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Discussion.tsx:304-307</code>: the end message (“The connection was lost.”, “The other participant left…”) is a <code>role="status"</code> paragraph created at the moment it has content.</li>
+          <li><code>Discussion.tsx:343-346</code>: the extend prompt is likewise a new <code>role="status"</code> element. It appears 30 seconds before the end and needs a decision.</li>
+          <li><code>home.tsx:368-372, 474-478</code>: an error paragraph stays mounted with identical text when the same error is returned twice (for example two wrong codes), so the DOM does not change.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>Polite live regions that are added to the page already filled are announced inconsistently across browser and screen-reader pairs. A user may miss that the call dropped, or miss the one chance to extend. After a second wrong code, a screen-reader user may hear nothing and not know the submission was rejected.</dd>
+      <dt>Recommended fix</dt><dd>Render the status containers once, empty, and change only their text. For repeated form errors, clear the message when a submission starts so the next result is a real change, or move focus to the invalid field.</dd>
+      <dt>Manual verification</dt><dd>With a screen reader: submit a wrong code twice; let a search time out; have the other participant leave; wait for the extend prompt. Record what is spoken each time.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m6">
+    <h4><span class="fid">M6</span>Sticky header and floating button can cover the focused element</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.4.11 Focus Not Obscured (Minimum), AA</dd>
+      <dt>Affected</dt><dd><code>/theme</code> chiefly; <code>Header</code>, “Add a voice” button</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Header.tsx:35-37</code>: <code>sticky top-0 z-20</code> with a background that is opaque for its top 80%.</li>
+          <li><code>theme.tsx:447</code>: the “Add a voice” button is <code>fixed right-3 bottom-3 z-20</code>.</li>
+          <li><code>Shell.tsx:34</code>: the scroller sets no <code>scroll-padding</code>. Only two targets reserve header space (<code>theme.tsx:251</code>, <code>Discussion.tsx:302</code>, via <code>scroll-mt-(--header-height)</code>).</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>When a keyboard user tabs backwards up a long chat, the browser may scroll the focused link or reactions button to the top edge, underneath the header, where it cannot be seen.</dd>
+      <dt>Recommended fix</dt><dd>Set <code>scroll-padding-top: var(--header-height)</code> and a matching bottom padding on whichever element scrolls (the document on mobile, the inner scroller on desktop).</dd>
+      <dt>Manual verification</dt><dd>On <code>/theme</code> with several voices added, press <kbd>Shift</kbd>+<kbd>Tab</kbd> from the bottom to the top. Check that each focused element is at least partly visible.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m7">
+    <h4><span class="fid">M7</span>Instructions identify controls by position and icon, not by name</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.3.3 Sensory Characteristics, A</dd>
+      <dt>Affected</dt><dd><code>/theme</code></dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>theme.tsx:436-437</code>: “Tap the button in the corner to choose who you want to include…”. The button's accessible name is “Add a voice” (<code>theme.tsx:443</code>).</li>
+          <li><code>theme.tsx:293-296</code>: “Click the microphone to start discussing. Or add them later through the button in the corner, by picking the first option.” The microphone button is named “Discuss with another user” (<code>theme.tsx:300</code>).</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>A screen-reader user hears about a corner and a microphone but can find neither: the controls they meet have different names.</dd>
+      <dt>Recommended fix</dt><dd>Name the controls in the text: “Use the <em>Add a voice</em> button (bottom corner)…”, “Use <em>Discuss with another user</em> (the microphone)…”.</dd>
+      <dt>Manual verification</dt><dd>With a screen reader, follow the instructions literally and see whether the right control can be found from the wording alone.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m8">
+    <h4><span class="fid">M8</span>Conversation and sign-up time limits cannot be adjusted by the user alone</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.2.1 Timing Adjustable, A (the real-time and essential exceptions may apply)</dd>
+      <dt>Affected</dt><dd><code>Discussion</code> widget; <code>/</code> sign-up step</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>lib/discussion.ts:6-14</code>: 60&nbsp;s search, 3&nbsp;min conversation, 1&nbsp;min extensions, 10&nbsp;min maximum, 30&nbsp;s window in which to extend.</li>
+          <li><code>Discussion.tsx:292-295</code>: an extension needs the other participants' agreement.</li>
+          <li><code>home.tsx:59-62</code>: an expired sign-up proof returns “that took too long — please start again” and discards the entered username, name and picture.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>People who speak, read or operate controls slowly, including users of speech devices and switch access, have three minutes to read six questions and discuss them, and thirty seconds to find and press “Extend”. A slow sign-up loses its data.</dd>
+      <dt>Recommended fix</dt><dd>This is a product decision as much as a code change. Options: announce the extend prompt earlier, let one participant's request stand for longer, state the time limit before the search starts, and keep the sign-up fields filled when the proof expires.</dd>
+      <dt>Manual verification</dt><dd>Decide whether the limits are essential to the feature. Time the sign-up step to find the actual expiry. Try the extend flow using keyboard only.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m9">
+    <h4><span class="fid">M9</span>Muted-microphone icon and the submit button's focus ring fall below 3:1</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.4.11 Non-text Contrast, AA</dd>
+      <dt>Affected</dt><dd><code>Discussion</code> widget; <code>/</code></dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Discussion.tsx:388</code>: when muted the button is <code>bg-gray-400</code> (#99a1af) with a white icon: <strong>2.60:1</strong>.</li>
+          <li><code>home.tsx:146</code>: the submit button's focus outline is the primary colour, 1&nbsp;px away from a button of the same colour, on <code>neutral-100</code>: <strong>2.80:1</strong> against the page.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>The muted state, which a user needs to be sure of, is the hardest to see. Keyboard users get a faint focus ring on the main call to action.</dd>
+      <dt>Recommended fix</dt><dd>Use <code>gray-600</code> or darker for the muted button. Use a dark outline (black, or the darker brand variant from <a href="#h1">H1</a>) with a 2&nbsp;px offset for the submit button.</dd>
+      <dt>Manual verification</dt><dd>Tab to “continue” and judge the ring. Mute in a live conversation and check the icon.</dd>
+    </dl>
+  </article>
+
+  <article class="finding med" id="m10">
+    <h4><span class="fid">M10</span>Chat live regions: long announcements, a hint that may never be read, and repeated auto-scroll</h4>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>4.1.3 Status Messages, AA; 3.1.2 Language of Parts, AA (as spoken); usability</dd>
+      <dt>Affected</dt><dd><code>/theme</code></dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>theme.tsx:248-252, 385</code>: whole bubbles sit in <code>aria-live="polite"</code> regions. Each German statement runs to several hundred characters and is followed by its citation link and, for the first bubble, the reactions button text.</li>
+          <li><code>theme.tsx:432-438</code>: the paragraph explaining what to do next is in the DOM from the start and revealed by removing <code>inert</code>. That is not a text insertion, so the live region may not announce it.</li>
+          <li><code>theme.tsx:262-264</code>: each time a bubble finishes “typing” the page scrolls back to the start of that voice's group, including for its second and third bubbles.</li>
+          <li><code>theme.tsx:268</code>: quotes are correctly marked <code>lang="de"</code>, but whether a live-region announcement switches voice is screen-reader dependent.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>A screen-reader user may sit through long, uninterruptible German passages, possibly in an English voice, and may miss the one sentence that explains how to proceed. A magnifier user reading the first quote is pulled back to the top when the second arrives.</dd>
+      <dt>Recommended fix</dt><dd>Announce a short summary instead of the content (“Die Linke added two statements”) and let users read the bubbles at their own pace. Render the hint paragraph when it becomes relevant rather than toggling <code>inert</code>. Scroll once per voice, not once per bubble.</dd>
+      <dt>Manual verification</dt><dd>Open <code>/theme</code> with a screen reader and listen through the intro without touching anything. Add a voice. Note what is spoken, in which language voice, and whether the “Different voices…” hint is heard.</dd>
+    </dl>
+  </article>
+
+  <!-- ---------------- LOW ---------------- -->
+  <h3 id="sev-low"><span class="tag t-low">Low</span> 12 findings</h3>
+
+  <article class="finding low" id="l1">
+    <h4><span class="fid">L1</span><code>aria-invalid</code> is set on the code field only</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>3.3.1 Error Identification, A (the text error is present; this is the programmatic state)</dd>
+      <dt>Affected</dt><dd><code>/</code>, email and sign-up steps</dd>
+      <dt>Evidence</dt><dd><code>home.tsx:364</code> sets <code>aria-invalid</code> on the code input. The email input (<code>home.tsx:451-468</code>) and username input (<code>home.tsx:298-312</code>) get <code>aria-describedby</code> on error but no <code>aria-invalid</code>. The username field is also described by the error when the error is about the picture (<code>home.tsx:77, 310</code>).</dd>
+      <dt>User impact</dt><dd>Returning to the field, a screen-reader user hears the message but not “invalid”.</dd>
+      <dt>Recommended fix</dt><dd>Add <code>aria-invalid</code> to both fields when their error is showing; point the picture error at the file input.</dd>
+      <dt>Manual verification</dt><dd>Trigger “invalid email address” and “that username is taken”; focus the field with a screen reader.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l2">
+    <h4><span class="fid">L2</span>Discussion questions list lacks <code>role="list"</code></h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.3.1 Info and Relationships, A</dd>
+      <dt>Affected</dt><dd><code>Discussion</code> widget</dd>
+      <dt>Evidence</dt><dd><code>Discussion.tsx:336</code>: a bare <code>&lt;ul&gt;</code>. Tailwind's reset removes list markers, and the code's own comment at <code>theme.tsx:492</code> notes that Safari then drops list semantics. The other lists (<code>theme.tsx:493</code>, <code>weeks.tsx:23</code>, <code>profile.tsx:30</code>) have the role.</dd>
+      <dt>User impact</dt><dd>VoiceOver users in Safari do not hear “list, 6 items”.</dd>
+      <dt>Recommended fix</dt><dd>Add <code>role="list"</code>.</dd>
+      <dt>Manual verification</dt><dd>VoiceOver in Safari, in a live conversation.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l3">
+    <h4><span class="fid">L3</span>Sign-in page title does not describe the page or its step</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.4.2 Page Titled, A</dd>
+      <dt>Affected</dt><dd><code>/</code></dd>
+      <dt>Evidence</dt><dd><code>home.tsx:27-29</code>: the title is “oder.locker” for all three steps. Other routes follow “oder.locker - page”.</dd>
+      <dt>User impact</dt><dd>In a tab list or history, the page's purpose is not stated.</dd>
+      <dt>Recommended fix</dt><dd>“Sign up or log in – oder.locker”, ideally reflecting the step. Putting the page name first helps on every route.</dd>
+      <dt>Manual verification</dt><dd>Read the tab title at each step.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l4">
+    <h4><span class="fid">L4</span>Visiting <code>/logout</code> directly appears to render an empty, untitled document</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.4.2 Page Titled, A; 1.3.1 Info and Relationships, A</dd>
+      <dt>Affected</dt><dd><code>/logout</code> (GET)</dd>
+      <dt>Evidence</dt><dd><code>routes.ts:16</code> places the route outside the layout; <code>logout.tsx:7-11</code> exports only an <code>action</code>: no component, loader or <code>meta</code>.</dd>
+      <dt>User impact</dt><dd>Someone who lands there from history or a bookmark gets a blank page with no title, heading or way out.</dd>
+      <dt>Recommended fix</dt><dd>Add a loader that redirects to <code>/</code>.</dd>
+      <dt>Manual verification</dt><dd>Type <code>/logout</code> into the address bar and see what renders.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l5">
+    <h4><span class="fid">L5</span>Error page reached by client navigation gets no focus move</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.4.3 Focus Order, A; 4.1.3 Status Messages, AA</dd>
+      <dt>Affected</dt><dd>Root <code>ErrorBoundary</code></dd>
+      <dt>Evidence</dt><dd><code>root.tsx:56-69</code> renders its own <code>&lt;Shell&gt;</code>. In that new instance <code>previous</code> is initialised to the current pathname (<code>Shell.tsx:9</code>), so the effect's first run returns early (<code>Shell.tsx:15</code>). The error text has no <code>role="alert"</code>.</dd>
+      <dt>User impact</dt><dd>If a loader fails during navigation, the error page replaces the content silently for screen-reader users.</dd>
+      <dt>Recommended fix</dt><dd>Focus the error heading on mount, or give the message <code>role="alert"</code>.</dd>
+      <dt>Manual verification</dt><dd>Force a loader to throw in development and navigate to it with a screen reader running.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l6">
+    <h4><span class="fid">L6</span>Underlined text that is not a link</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>Best practice (related to 3.2.4 Consistent Identification)</dd>
+      <dt>Affected</dt><dd><code>/profile</code></dd>
+      <dt>Evidence</dt><dd><code>profile.tsx:71</code>: <code>&lt;span className="underline"&gt;2 comments&lt;/span&gt;</code>. Elsewhere underline marks links and text buttons.</dd>
+      <dt>User impact</dt><dd>Looks clickable; does nothing.</dd>
+      <dt>Recommended fix</dt><dd>Make it a link when the destination exists; drop the underline until then.</dd>
+      <dt>Manual verification</dt><dd>None needed.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l7">
+    <h4><span class="fid">L7</span>On desktop the page scrolls inside a container that scroll restoration and the keyboard may not reach</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.1.1 Keyboard, A</dd>
+      <dt>Affected</dt><dd>All routes at 640&nbsp;px and above</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>Shell.tsx:34</code>: content scrolls in an inner <code>&lt;div&gt;</code> with <code>sm:overflow-auto sm:scrollbar-none</code>. The div is not focusable.</li>
+          <li><code>root.tsx:29</code> with React Router's <code>lib/dom/lib.js:1114-1129</code>: scroll restoration acts on <code>window</code> only, so the inner container's position is neither reset nor restored on navigation.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>On first load, arrow keys and <kbd>Space</kbd> may not scroll the content in browsers that do not make scroll containers keyboard-focusable, until the user tabs into it. No scrollbar shows that more content exists.</dd>
+      <dt>Recommended fix</dt><dd>Leave the scrollbar visible (thin is fine). Reset the scroller's <code>scrollTop</code> in the same effect that moves focus.</dd>
+      <dt>Manual verification</dt><dd>On desktop Safari, load <code>/privacy</code> and <code>/theme</code> and press <kbd>↓</kbd> and <kbd>Space</kbd> before touching anything else.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l8">
+    <h4><span class="fid">L8</span>Emoji picker: German interface, stays open when focus leaves, third-party keyboard support</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>2.1.1 Keyboard, A; 2.4.3 Focus Order, A</dd>
+      <dt>Affected</dt><dd><code>/theme</code>, reactions (<code>ChatBubble</code>, <code>EmojiPicker</code>)</dd>
+      <dt>Evidence</dt>
+      <dd>
+        <ul>
+          <li><code>EmojiPicker.tsx:39-41</code>: locale is German while the surrounding interface is English. The wrapper is correctly marked <code>lang="de"</code> (<code>:67</code>).</li>
+          <li><code>ChatBubble.tsx:194-218</code>: a non-modal <code>role="dialog"</code>. <kbd>Esc</kbd> and selection close it and return focus; tabbing out leaves it open over the content.</li>
+          <li><code>EmojiPicker.tsx:25, 42</code>: the picker loads lazily, so focus moves into it only after the import resolves.</li>
+        </ul>
+      </dd>
+      <dt>User impact</dt><dd>Search and category labels are in a different language from the rest of the page. A keyboard user can leave the picker open behind them.</dd>
+      <dt>Recommended fix</dt><dd>Match the picker locale to the page. Close on focus leaving the dialog.</dd>
+      <dt>Manual verification</dt><dd>Open the picker by keyboard; search, move between emoji with arrow keys, select, and escape. Repeat with a screen reader. The picker's internals are in a shadow DOM and were not reviewed.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l9">
+    <h4><span class="fid">L9</span>Latent contrast trap in the bubble's default author colour</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.4.3 Contrast (Minimum), AA (not currently triggered)</dd>
+      <dt>Affected</dt><dd><code>ChatBubble</code></dd>
+      <dt>Evidence</dt><dd><code>ChatBubble.tsx:152</code>: the author name defaults to <code>text-green-200</code> (1.21:1 on white) unless <code>author.color</code> is given. Every author in <code>theme.tsx:42-78</code> supplies one today. <code>ChatBubble.tsx:96</code> also carries both <code>text-black!</code> and <code>text-white</code>.</dd>
+      <dt>User impact</dt><dd>None now. The next author added without a colour would be nearly invisible.</dd>
+      <dt>Recommended fix</dt><dd>Default to a dark colour; remove the stray <code>text-white</code>.</dd>
+      <dt>Manual verification</dt><dd>None needed.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l10">
+    <h4><span class="fid">L10</span>Voices dialog closes only when an animation ends</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>Robustness (related to 2.1.2 No Keyboard Trap; <kbd>Esc</kbd> still works)</dd>
+      <dt>Affected</dt><dd><code>/theme</code>, “Add a voice” dialog</dd>
+      <dt>Evidence</dt><dd><code>theme.tsx:537-539</code>: picking a voice makes its row <code>inert</code> and relies on <code>onAnimationEnd</code> to call <code>close()</code>. The reduced-motion rule keeps an animation running (<code>app.css:125-130</code>), which is correct, but a user stylesheet or tool that disables animations outright would leave the dialog open with the focused row inert.</dd>
+      <dt>User impact</dt><dd>In that setup the dialog stays open after a choice until closed by hand.</dd>
+      <dt>Recommended fix</dt><dd>Add a timeout fallback that closes the dialog if no <code>animationend</code> arrives.</dd>
+      <dt>Manual verification</dt><dd>Disable animations with a browser extension or DevTools and pick a voice.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l11">
+    <h4><span class="fid">L11</span>Truncated and clamped text may hide content when text spacing is increased</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-manual">Requires manual verification</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>1.4.12 Text Spacing, AA</dd>
+      <dt>Affected</dt><dd><code>/</code> code step; <code>/theme</code></dd>
+      <dt>Evidence</dt><dd><code>home.tsx:348</code> truncates the email address to one line. <code>ChatBubble.tsx:172</code> and <code>theme.tsx:560</code> clamp citation titles and voice names to two lines. <code>Discussion.tsx:320</code> truncates participant names. <code>ChatBubble.tsx:131</code> fixes a height in <code>em</code>.</dd>
+      <dt>User impact</dt><dd>With a text-spacing override, more of each string is cut off with no way to reveal it. A long email address cannot be checked for typos.</dd>
+      <dt>Recommended fix</dt><dd>Let the email wrap (<code>break-all</code>) instead of truncating. Consider dropping the clamp on citations.</dd>
+      <dt>Manual verification</dt><dd>Apply a text-spacing bookmarklet and compare.</dd>
+    </dl>
+  </article>
+
+  <article class="finding low" id="l12">
+    <h4><span class="fid">L12</span>Sign-in email has no document language or title; discussions are voice-only</h4>
+    <p class="tags"><span class="tag t-low">Low</span><span class="tag t-ok">Confirmed in source</span></p>
+    <dl>
+      <dt>WCAG</dt><dd>3.1.1 Language of Page, A (email). The voice-only point is advisory: WCAG 1.2.4 is not aimed at two-way calls.</dd>
+      <dt>Affected</dt><dd><code>lib/emails.ts</code>; <code>Discussion</code> widget</dd>
+      <dt>Evidence</dt><dd><code>emails.ts:34-39</code>: <code>&lt;html&gt;</code> without <code>lang</code>, no <code>&lt;title&gt;</code>. The discussion feature (<code>Discussion.tsx:232-236</code>) requires a microphone and offers no text channel.</dd>
+      <dt>User impact</dt><dd>Screen readers may read the email in the wrong voice. Deaf, hard-of-hearing and non-speaking users cannot take part in discussions.</dd>
+      <dt>Recommended fix</dt><dd>Add <code>lang="en"</code> and a title to the email. Consider a text alternative for discussions as a product decision.</dd>
+      <dt>Manual verification</dt><dd>Open a received code email with a screen reader.</dd>
+    </dl>
+  </article>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="contrast">Colour contrast measurements</h2>
+  <p>Ratios were calculated from the colour values in the source: the theme tokens in <code>app/app.css:7-9</code> and the Tailwind 4.3.3 palette (OKLCH values converted to sRGB). Semi-transparent colours were flattened over their background. These are computed values, not samples from a rendered page.</p>
+  <div class="scroll" role="region" aria-label="Colour contrast measurements" tabindex="0">
+    <table>
+      <caption>Text and component contrast (4.5:1 needed for this text; 3:1 for components)</caption>
+      <thead><tr><th scope="col">Pair</th><th scope="col">Used for</th><th scope="col">Ratio</th><th scope="col">Result</th></tr></thead>
+      <tbody>
+        <tr><td><span class="sw" style="background:#9466f2"></span>White on secondary</td><td>Field text</td><td class="num">3.86</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#9466f2"></span>White 70% on secondary</td><td>Placeholders</td><td class="num">2.69</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#f7661e"></span>White on primary</td><td>Submit, Extend, Discuss row</td><td class="num">3.05</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#f77b3e"></span>White on primary 85%</td><td>Submit hover</td><td class="num">2.67</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#9466f2"></span>Secondary on neutral-100</td><td>Sign-in headings</td><td class="num">3.54</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#9466f2"></span>Secondary on white</td><td>Timer</td><td class="num">3.86</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#f7661e"></span>Primary on white</td><td>Timer, last 30 s</td><td class="num">3.05</td><td><span class="tag t-high">Fails</span></td></tr>
+        <tr><td><span class="sw" style="background:#99a1af"></span>White on gray-400</td><td>Muted mic icon</td><td class="num">2.60</td><td><span class="tag t-med">Fails 3:1</span></td></tr>
+        <tr><td><span class="sw" style="background:#f7661e"></span>Primary on neutral-100</td><td>Submit focus ring</td><td class="num">2.80</td><td><span class="tag t-med">Fails 3:1</span></td></tr>
+        <tr><td><span class="sw" style="background:#c10007"></span>Red-700 on neutral-100</td><td>Form errors</td><td class="num">5.89</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#e7000b"></span>Red-600 on white</td><td>Audio error; Die Linke name</td><td class="num">4.77</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#525252"></span>Neutral-600 on neutral-100</td><td>Secondary text</td><td class="num">7.17</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#364153"></span>Gray-700 on neutral-100</td><td>Chat hints</td><td class="num">9.45</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#155dfc"></span>Blue-600 on neutral-100</td><td>Citation links</td><td class="num">4.81</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#008236"></span>Green-700 on white</td><td>GdP name</td><td class="num">4.95</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#d02c4a"></span>rgb(208,44,74) on white</td><td>ver.di name</td><td class="num">5.07</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#a65f00"></span>Yellow-700 on white</td><td>digital courage name</td><td class="num">4.93</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#07516c"></span>#07516c on white</td><td>bff name</td><td class="num">8.74</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#1e2939"></span>Gray-800 on white</td><td>CDU name</td><td class="num">14.67</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#e7000b"></span>White on red-600</td><td>Leave button icon</td><td class="num">4.77</td><td><span class="tag t-ok">Passes</span></td></tr>
+        <tr><td><span class="sw" style="background:#f7661e"></span>Black on primary</td><td>Discuss row focus ring</td><td class="num">6.87</td><td><span class="tag t-ok">Passes</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>The comments at <code>home.tsx:149-150</code> and <code>theme.tsx:41</code> claim 4.5:1 for the error text and author colours; the calculations bear both out.</p>
+  <p><span class="tag t-manual">Requires manual verification</span> The lightbox caption (12&nbsp;px white over a gradient over the photograph, <code>theme.tsx:627-633</code>), anything drawn over images, and all default browser focus rings.</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="motion">Animation and reduced motion</h2>
+  <p>Every CSS animation in <code>app/app.css</code> has a <code>prefers-reduced-motion: reduce</code> counterpart that removes movement and scaling and keeps, at most, a fade.</p>
+  <div class="scroll" role="region" aria-label="Animations and their reduced-motion handling" tabindex="0">
+    <table>
+      <caption>Animations and their reduced-motion handling</caption>
+      <thead><tr><th scope="col">Animation</th><th scope="col">Defined</th><th scope="col">Used</th><th scope="col">Under reduced motion</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Page slide-in</th><td><code>app.css:22-34</code></td><td><code>PageTransition.tsx:18</code></td><td><code>animation: none</code> (<code>app.css:36-40</code>)</td></tr>
+        <tr><th scope="row">Typing dots</th><td><code>app.css:133-156</code></td><td><code>ChatBubble.tsx:137-145</code></td><td>Opacity pulse, no hop (<code>app.css:158-173</code>)</td></tr>
+        <tr><th scope="row">Search rings</th><td><code>app.css:177-194</code></td><td><code>Discussion.tsx:420-421</code></td><td>Static scale, opacity pulse (<code>app.css:196-211</code>)</td></tr>
+        <tr><th scope="row">Chat-bubble pop-in (<code>.bubble-pop-in</code>)</th><td><code>app.css:216-243</code></td><td><code>ChatBubble.tsx:93</code></td><td>280&nbsp;ms fade, no scaling (<code>app.css:279-290</code>)</td></tr>
+        <tr><th scope="row"><code>.pop-in</code> spring</th><td><code>app.css:247-277</code></td><td><code>theme.tsx:447</code>, <code>Discussion.tsx:346</code></td><td>Fade only (<code>app.css:279-290</code>)</td></tr>
+        <tr><th scope="row">Reactions pill</th><td><code>ChatBubble.tsx:64-71</code> (Web Animations API)</td><td>Same</td><td>200&nbsp;ms fade, chosen by <code>matchMedia</code></td></tr>
+        <tr><th scope="row">Voice row collapse</th><td><code>app.css:94-116</code></td><td><code>theme.tsx:539</code></td><td>200&nbsp;ms fade (<code>app.css:119-130</code>)</td></tr>
+        <tr><th scope="row">Hint reveal</th><td><code>theme.tsx:213-214</code></td><td><code>theme.tsx:290, 434</code></td><td>Opacity only (<code>motion-reduce:</code>)</td></tr>
+        <tr><th scope="row">Dialog open</th><td><code>theme.tsx:469</code></td><td>Same</td><td>Opacity only (<code>motion-reduce:</code>)</td></tr>
+        <tr><th scope="row">Scripted scrolling</th><td><code>lib/scroll.ts:4-11</code></td><td><code>theme.tsx:263, 465</code>, <code>Discussion.tsx:115</code></td><td>Instant instead of smooth</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>The chat-bubble pop-in specifically</h3>
+  <div class="note">
+    <p><strong>This code changed during the audit.</strong> When the review began, <code>.bubble-pop-in</code> was defined but applied to nothing. Uncommitted edits to <code>app/app.css</code> and <code>ChatBubble.tsx</code> that appeared partway through wire it up. What follows describes the working tree as it stood when the report was finished.</p>
+  </div>
+  <p><span class="tag t-ok">Confirmed in source</span> Every bubble's shadow wrapper now carries <code>bubble-pop-in</code> (<code>ChatBubble.tsx:93</code>). The rule (<code>app.css:216-237</code>) runs the <code>bubble-scale-in</code> keyframes (<code>app.css:239-243</code>) for 280&nbsp;ms: the bubble grows from scale 0 out of its bottom-left corner, reaches full size at roughly 150&nbsp;ms, overshoots by 1% and settles.</p>
+  <p>Under <code>prefers-reduced-motion: reduce</code>, the rule at <code>app.css:285-290</code> swaps the keyframes for <code>bubble-fade-in</code> (<code>app.css:279-283</code>). The bubble then fades from transparent over the same 280&nbsp;ms and does not scale or move. That is the right treatment: the motion is removed and the cue that something appeared is kept. The easing curve's 1% overshoot has no visible effect on opacity.</p>
+  <p>Points worth knowing:</p>
+  <ul>
+    <li>The class is on the wrapper, which stays mounted when a bubble goes from typing dots to text, so the animation plays once per bubble and not again when the text arrives.</li>
+    <li>It plays for every bubble present at first paint as well (the photograph and the opening question), not only for bubbles added later.</li>
+    <li>The animation is short, plays once and involves no flashing. It raises no WCAG AA concern with motion enabled; 2.3.3 Animation from Interactions is AAA and is met anyway through the fallback.</li>
+    <li>The reactions pill animates separately through the Web Animations API and chooses its reduced-motion variant in script (<code>ChatBubble.tsx:64-71</code>). The <code>.pop-in</code> class on the “Add a voice” button and the extend prompt shares the same CSS fallback.</li>
+  </ul>
+  <p><span class="tag t-manual">Requires manual verification</span> That the fade is what actually renders with the operating system's reduce-motion setting on, in Safari, Chrome and Firefox, and that the first-paint animation does not replay after hydration.</p>
+
+  <h3>Not gated, and why that is probably fine</h3>
+  <ul>
+    <li><code>active:scale-95</code> press feedback on buttons (<code>Discussion.tsx:84, 369</code>; <code>theme.tsx:304, 447</code>; <code>ChatBubble.tsx:114</code>): tiny, and user-initiated.</li>
+    <li>The search progress bar (<code>Discussion.tsx:440</code>): a linear width change that conveys progress.</li>
+    <li>Lightbox backdrop and caption fades (<code>app.css:56-84</code>): opacity only. The lightbox library has its own reduced-motion check.</li>
+  </ul>
+  <p><span class="tag t-manual">Requires manual verification</span> The search rings and typing dots run indefinitely while their state lasts (up to 60 seconds for the rings). WCAG 2.2.2 expects a way to pause motion lasting over five seconds; “stop looking” ends it, at the cost of ending the search. Also confirm that the header's own view-transition group shows no visible cross-fade with reduced motion on.</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="good">Already implemented correctly</h2>
+  <p>These were verified in the source and should be preserved.</p>
+
+  <h3>Structure and navigation</h3>
+  <ul>
+    <li><code>&lt;html lang="en"&gt;</code> and a viewport meta that does not disable zoom (<code>root.tsx:20, 23</code>).</li>
+    <li>A skip link as the first focusable element, visible on focus, that focuses <code>&lt;main&gt;</code> rather than changing the URL fragment the sign-in page reads (<code>Shell.tsx:35-46</code>).</li>
+    <li>Banner, labelled navigation and main landmarks on every page, including the error page (<code>Header.tsx:35, 39</code>; <code>Shell.tsx:48</code>; <code>root.tsx:57</code>).</li>
+    <li>Exactly one <code>&lt;h1&gt;</code> per page and no skipped heading levels.</li>
+    <li>A distinct title for every page route, and for 404 and error states.</li>
+    <li>Deliberate focus movement after client-side navigation that respects <code>autoFocus</code> (<code>Shell.tsx:14-20</code>).</li>
+  </ul>
+
+  <h3>Names and images</h3>
+  <ul>
+    <li>Icon-only links and buttons have accessible names, with their icons hidden (<code>Header.tsx:42-58</code>; <code>theme.tsx:300, 443, 481</code>; <code>Discussion.tsx:381, 398</code>).</li>
+    <li>Decorative images use <code>alt=""</code> where the name is adjacent; the topic photograph has a full description, repeated in the lightbox (<code>theme.tsx:27-28, 372, 580</code>).</li>
+    <li>The mute button keeps a stable name and exposes its state with <code>aria-pressed</code> (<code>Discussion.tsx:379-382</code>).</li>
+    <li>New-tab links say so in visually hidden text, including “PDF” (<code>ChatBubble.tsx:189-191</code>; <code>privacy.tsx:30</code>).</li>
+    <li>A hidden “Location:” label where only an icon gave the meaning (<code>profile.tsx:46</code>).</li>
+  </ul>
+
+  <h3>Forms</h3>
+  <ul>
+    <li>Every input has a programmatic label; each form is named by its heading (<code>home.tsx:234, 339, 439</code>).</li>
+    <li>Correct <code>autocomplete</code> tokens: <code>email</code>, <code>one-time-code</code>, <code>username</code>, <code>name</code>; a numeric keypad for the code.</li>
+    <li>Errors use <code>role="alert"</code> and are tied to their field with <code>aria-describedby</code>; the neutral “requested a new code” uses <code>role="status"</code>.</li>
+    <li>The error colour was chosen for contrast and measures 5.89:1.</li>
+    <li>Optional fields are marked as optional in their labels.</li>
+  </ul>
+
+  <h3>Dialogs and dynamic content</h3>
+  <ul>
+    <li>The voices picker is a native modal <code>&lt;dialog&gt;</code> opened with <code>showModal()</code>, labelled by its heading, with a named close button and backdrop dismissal (<code>theme.tsx:455-486</code>). Focus trapping, <kbd>Esc</kbd> and focus return come from the browser.</li>
+    <li>The emoji picker closes on <kbd>Esc</kbd> and returns focus to its trigger, which exposes <code>aria-expanded</code> (<code>ChatBubble.tsx:111-112, 203-207</code>).</li>
+    <li>Typing indicators carry real text (“… is typing…”) with the dots hidden (<code>ChatBubble.tsx:131-146</code>).</li>
+    <li>The discussion widget takes focus when it appears and keeps it when its buttons disappear (<code>Discussion.tsx:114-125, 367</code>).</li>
+    <li>The countdown is a <code>role="timer"</code> with a hidden “Time left:” prefix, so it does not chatter (<code>Discussion.tsx:323-329</code>).</li>
+    <li>Inactive, not-yet-revealed content is <code>inert</code> rather than merely transparent (<code>theme.tsx:289, 433</code>).</li>
+    <li>The <kbd>Esc</kbd> shortcut for cancelling a search is declared with <code>aria-keyshortcuts</code> and defers to open dialogs (<code>Discussion.tsx:277-286, 448</code>).</li>
+  </ul>
+
+  <h3>Language, motion, targets</h3>
+  <ul>
+    <li>German quotations, citations and the emoji picker are marked <code>lang="de"</code> (<code>theme.tsx:266, 268</code>; <code>ChatBubble.tsx:186</code>).</li>
+    <li>Quotations use <code>&lt;blockquote cite&gt;</code> and <code>&lt;cite&gt;</code>; the photograph uses <code>&lt;figure&gt;</code> and <code>&lt;figcaption&gt;</code>.</li>
+    <li>Reduced motion is honoured throughout, in CSS and in script (see the previous section).</li>
+    <li>Icon buttons are 36 to 40&nbsp;px or larger; the small text buttons have enough clear space around them to meet 2.5.8 by its spacing exception, as far as the layout classes show.</li>
+    <li>No swipe-only, drag-only or hover-only interaction in the app's own code. The lightbox's swipe-to-dismiss has close-button, backdrop and <kbd>Esc</kbd> alternatives (<code>theme.tsx:639-644</code>).</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="quick">Quick wins (under an hour)</h2>
+  <p>Each of these is a few lines. Together they fit in a single sitting.</p>
+  <ol>
+    <li><strong>Name <code>&lt;main&gt;</code> by the page heading</strong> so the existing focus move announces the page (<a href="#m1">M1</a>).</li>
+    <li><strong>Focus the email field</strong> after “use another email”, and the file input after “remove picture” (<a href="#m2">M2</a>).</li>
+    <li><strong>Add <code>aria-invalid</code></strong> to the email and username fields (<a href="#l1">L1</a>).</li>
+    <li><strong>Add <code>role="list"</code></strong> to the discussion questions (<a href="#l2">L2</a>).</li>
+    <li><strong>Reword the two instructions</strong> to use the buttons' names (<a href="#m7">M7</a>).</li>
+    <li><strong>Darken the muted-mic button</strong> and give “continue” a dark focus ring (<a href="#m9">M9</a>).</li>
+    <li><strong>Add <code>scroll-padding-top</code></strong> equal to the header height (<a href="#m6">M6</a>).</li>
+    <li><strong>Give the sign-in page a descriptive title</strong> (<a href="#l3">L3</a>).</li>
+    <li><strong>Redirect GET <code>/logout</code></strong> to <code>/</code> (<a href="#l4">L4</a>).</li>
+    <li><strong>Change the default author colour</strong> and remove the underline on “2 comments” (<a href="#l9">L9</a>, <a href="#l6">L6</a>).</li>
+    <li><strong>Add <code>lang</code> and a title</strong> to the sign-in email (<a href="#l12">L12</a>).</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="plan">Prioritised remediation plan</h2>
+
+  <h3>Phase 1: the sign-in path (highest reach)</h3>
+  <ol>
+    <li>Introduce darker text-safe variants of the two brand colours and apply them to fields, buttons, headings and the timer (<a href="#h1">H1</a>, <a href="#m9">M9</a>).</li>
+    <li>Make field labels visible (<a href="#m3">M3</a>).</li>
+    <li>Surface Turnstile failures and busy states (<a href="#m4">M4</a>).</li>
+    <li>Fix the two focus losses and add <code>aria-invalid</code> (<a href="#m2">M2</a>, <a href="#l1">L1</a>).</li>
+  </ol>
+
+  <h3>Phase 2: layout under zoom</h3>
+  <ol>
+    <li>Gate the phone frame on available height as well as width, add a minimum width, and make the form widths fluid (<a href="#h2">H2</a>).</li>
+    <li>Add scroll padding, keep a visible scrollbar, and reset the inner scroller on navigation (<a href="#m6">M6</a>, <a href="#l7">L7</a>).</li>
+  </ol>
+
+  <h3>Phase 3: announcements</h3>
+  <ol>
+    <li>Route changes: label <code>&lt;main&gt;</code> or focus the heading; consider a title announcer (<a href="#m1">M1</a>, <a href="#l5">L5</a>).</li>
+    <li>Discussion widget: one persistent status element covering search, connection, extend prompt and ending (<a href="#h3">H3</a>, <a href="#m5">M5</a>).</li>
+    <li>Chat: shorten what the live regions announce, render the hint when relevant, scroll once per voice (<a href="#m10">M10</a>).</li>
+    <li>Reword position-based instructions (<a href="#m7">M7</a>).</li>
+  </ol>
+
+  <h3>Phase 4: product decisions and polish</h3>
+  <ol>
+    <li>Decide on the conversation time limits and whether to offer a text alternative (<a href="#m8">M8</a>, <a href="#l12">L12</a>).</li>
+    <li>Work through the remaining low-severity items (<a href="#l2">L2</a> to <a href="#l11">L11</a>).</li>
+    <li>Run the manual checklist below and re-rank anything it changes.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="checklist">Manual-testing checklist</h2>
+  <p>None of this has been done. Ticks are saved in this browser only.</p>
+  <p><button type="button" class="plain" id="reset">Clear all ticks</button> <span id="reset-status" role="status"></span></p>
+
+  <h3>Keyboard only</h3>
+  <ul class="check">
+    <li><label><input type="checkbox" data-k="k1"><span>On each page, the first <kbd>Tab</kbd> shows “Skip to content”; activating it moves focus past the header.</span></label></li>
+    <li><label><input type="checkbox" data-k="k2"><span>Every link and button shows a clearly visible focus indicator, including the header links, dialog close button and reactions pill.</span></label></li>
+    <li><label><input type="checkbox" data-k="k3"><span>Complete sign-in with email and code, and sign-up with a picture, without a mouse.</span></label></li>
+    <li><label><input type="checkbox" data-k="k4"><span>After “use another email” and “remove picture”, one <kbd>Tab</kbd> press lands somewhere sensible.</span></label></li>
+    <li><label><input type="checkbox" data-k="k5"><span>Open “Add a voice”: focus is inside, <kbd>Tab</kbd> stays inside, <kbd>Esc</kbd> closes, focus returns to the button.</span></label></li>
+    <li><label><input type="checkbox" data-k="k6"><span>Open the emoji picker: search, arrow between emoji, select, and <kbd>Esc</kbd> all work.</span></label></li>
+    <li><label><input type="checkbox" data-k="k7"><span>Open the photograph: the lightbox can be closed by keyboard and zoomed with <kbd>+</kbd> and <kbd>-</kbd>.</span></label></li>
+    <li><label><input type="checkbox" data-k="k8"><span>Start a discussion, mute, unmute, extend and leave by keyboard.</span></label></li>
+    <li><label><input type="checkbox" data-k="k9"><span>On <code>/theme</code> with several voices, <kbd>Shift</kbd>+<kbd>Tab</kbd> upwards: no focused element is hidden under the header.</span></label></li>
+    <li><label><input type="checkbox" data-k="k10"><span>On desktop Safari, <kbd>↓</kbd> and <kbd>Space</kbd> scroll the content straight after page load.</span></label></li>
+  </ul>
+
+  <h3>Route changes with a screen reader</h3>
+  <ul class="check">
+    <li><label><input type="checkbox" data-k="r1"><span>Follow each header link: write down exactly what is spoken. Is the new page named?</span></label></li>
+    <li><label><input type="checkbox" data-k="r2"><span>Use the browser's back and forward buttons: same question.</span></label></li>
+    <li><label><input type="checkbox" data-k="r3"><span>Sign in: after the redirect to <code>/theme</code>, is the page change announced before the chat starts speaking?</span></label></li>
+    <li><label><input type="checkbox" data-k="r4"><span>Sign out: the sign-in page is announced as a new page load.</span></label></li>
+    <li><label><input type="checkbox" data-k="r5"><span>Visit a nonexistent URL: the 404 heading is reachable and the title reads “oder.locker - 404”.</span></label></li>
+    <li><label><input type="checkbox" data-k="r6"><span>Repeat the above in at least VoiceOver with Safari, NVDA with Firefox, and TalkBack or VoiceOver on a phone.</span></label></li>
+  </ul>
+
+  <h3>Forms and status messages with a screen reader</h3>
+  <ul class="check">
+    <li><label><input type="checkbox" data-k="f1"><span>Each sign-in field announces its label; the form's heading is announced on entry.</span></label></li>
+    <li><label><input type="checkbox" data-k="f2"><span>An invalid email, a wrong code and a taken username are each announced without moving focus.</span></label></li>
+    <li><label><input type="checkbox" data-k="f3"><span>Submit the same wrong code twice: is the second failure announced?</span></label></li>
+    <li><label><input type="checkbox" data-k="f4"><span>“send a new code” announces “requested a new code”, including the second time.</span></label></li>
+    <li><label><input type="checkbox" data-k="f5"><span>With Turnstile blocked or slow, is there any indication why “continue” is unavailable?</span></label></li>
+    <li><label><input type="checkbox" data-k="f6"><span>If Turnstile shows an interactive challenge, it can be completed by keyboard and screen reader.</span></label></li>
+  </ul>
+
+  <h3>Chat and discussion with a screen reader</h3>
+  <ul class="check">
+    <li><label><input type="checkbox" data-k="c1"><span>Load <code>/theme</code> and listen: the question and summary are read; the “Different voices…” hint is read.</span></label></li>
+    <li><label><input type="checkbox" data-k="c2"><span>Add a voice: the statements are announced, in a German voice, and can be interrupted.</span></label></li>
+    <li><label><input type="checkbox" data-k="c3"><span>Add a reaction: the new emoji is announced.</span></label></li>
+    <li><label><input type="checkbox" data-k="c4"><span>Start a discussion: the microphone prompt and “Looking for someone…” are announced.</span></label></li>
+    <li><label><input type="checkbox" data-k="c5"><span>When a match is found, is the other person's name announced? Is the time limit?</span></label></li>
+    <li><label><input type="checkbox" data-k="c6"><span>At 30 seconds left, the extend prompt is announced and “Extend” is easy to reach.</span></label></li>
+    <li><label><input type="checkbox" data-k="c7"><span>Each ending is announced: timed out, other person left, you left, connection lost, microphone refused.</span></label></li>
+  </ul>
+
+  <h3>Visual, zoom and motion</h3>
+  <ul class="check">
+    <li><label><input type="checkbox" data-k="v1"><span>Confirm the failing pairs in the contrast table with a colour picker on the rendered page.</span></label></li>
+    <li><label><input type="checkbox" data-k="v2"><span>At 1280×720 and 1366×768, zoom to 150%, 200% and 400%: no clipped fields, no horizontal scrolling.</span></label></li>
+    <li><label><input type="checkbox" data-k="v3"><span>At 320&nbsp;px wide, every page works with vertical scrolling only.</span></label></li>
+    <li><label><input type="checkbox" data-k="v4"><span>Rotate a phone to landscape on <code>/</code> and <code>/theme</code>.</span></label></li>
+    <li><label><input type="checkbox" data-k="v5"><span>Apply a text-spacing bookmarklet: no text is cut off or overlapping.</span></label></li>
+    <li><label><input type="checkbox" data-k="v6"><span>With “reduce motion” on: no sliding, bouncing or scaling anywhere; scrolling is instant.</span></label></li>
+    <li><label><input type="checkbox" data-k="v7"><span>With “reduce motion” off: nothing flashes; the rings and dots are not distracting over a full minute.</span></label></li>
+    <li><label><input type="checkbox" data-k="v8"><span>In Windows high-contrast (forced colours) mode, buttons, focus rings and the typing indicator remain visible.</span></label></li>
+    <li><label><input type="checkbox" data-k="v9"><span>Measure the smallest touch targets on a phone: text buttons, citation links, the reactions pill.</span></label></li>
+    <li><label><input type="checkbox" data-k="v10"><span>Operate the sign-in form and the “Add a voice” button by voice control, speaking the visible labels.</span></label></li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section>
+  <h2 id="limits">Limitations</h2>
+  <p>This was a static code review. The application was not started, no browser was opened, and no automated tool (Lighthouse, axe) or assistive technology was run. That has consequences:</p>
+  <ul>
+    <li><strong>No runtime results are reported.</strong> Statements about what a screen reader says, where focus lands on screen, or how a layout renders are inferences from the code and are marked “Requires manual verification” wherever the code alone does not settle them.</li>
+    <li><strong>Contrast ratios are computed</strong> from declared colour values, not sampled from pixels. Text over images, gradients and browser-default focus rings were not measured.</li>
+    <li><strong>Layout figures in H2 are arithmetic</strong> on the CSS classes. The real rendering may differ.</li>
+    <li><strong>Third-party code was not audited:</strong> Cloudflare Turnstile (a remote script and iframe), <code>emoji-mart</code> 5.6.0 (shadow DOM) and <code>yet-another-react-lightbox</code> 3.32.2. Only how the app configures them was reviewed.</li>
+    <li><strong>React Router's default behaviour</strong> was established by reading the installed 8.4.0 build in <code>node_modules</code>, not by observing it.</li>
+    <li><strong>Server and data code</strong> (<code>auth.server.ts</code>, <code>photo.server.ts</code>, <code>workers/discussions.ts</code>) was read only where it shapes what the user sees.</li>
+    <li><strong>Other files in <code>public/</code></strong> (<code>discussion-widget.html</code>, <code>discussion-connection-loss.html</code>, <code>discussion-e2ee-and-reporting.html</code>) are standalone documents, not part of the application, and were not audited.</li>
+    <li><strong>The code was being edited during the review.</strong> <code>app/app.css</code> and <code>ChatBubble.tsx</code> changed partway through. The animation section was rewritten against the new code and the other references to those files were rechecked, but line numbers will drift as work continues.</li>
+    <li><strong>Content is placeholder in places</strong> (profile statistics, “16 people engaged”, local-only reactions). Findings may shift when real data flows through.</li>
+    <li><strong>A static review cannot certify conformance.</strong> WCAG conformance needs the manual checks listed above, ideally including testing with disabled users.</li>
+  </ul>
+</section>
+
+</div>
+</main>
+
+<footer class="page">
+  <div class="wrap">
+    <p>Static accessibility audit of the oder.locker codebase against WCAG 2.2 AA, 7 October 2026. Line references are to the working tree at commit <code>cba3dc0</code> with uncommitted changes in <code>app/components/chat/Discussion.tsx</code>, <code>app/components/chat/ChatBubble.tsx</code> and <code>app/app.css</code>.</p>
+  </div>
+</footer>
+
+<script>
+  // Remembers checklist ticks in this browser. The page works without it.
+  (function () {
+    var KEY = "oder-a11y-audit-checklist";
+    var boxes = document.querySelectorAll(".check input[type=checkbox]");
+    var saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch (e) {}
+    function store() {
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+    }
+    boxes.forEach(function (box) {
+      box.checked = !!saved[box.dataset.k];
+      box.addEventListener("change", function () {
+        saved[box.dataset.k] = box.checked;
+        store();
+      });
+    });
+    document.getElementById("reset").addEventListener("click", function () {
+      saved = {};
+      boxes.forEach(function (box) { box.checked = false; });
+      store();
+      document.getElementById("reset-status").textContent = "All ticks cleared.";
+    });
+  })();
+</script>
+</body>
+</html>

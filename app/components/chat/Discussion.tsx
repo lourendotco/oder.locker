@@ -189,6 +189,7 @@ function Discussion() {
       });
     };
 
+    // can i do all of this server side?
     // Asks for the microphones that have come up since the last time.
     const pull = () => {
       if (!connected || pulling || !latest) return;
@@ -238,7 +239,7 @@ function Discussion() {
       microphone.current = stream;
 
       ws = new WebSocket(
-        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/discuss`,
+        `${import.meta.env.PROD ? "wss" : "ws"}://${location.host}/discuss`,
       );
       // One at a time, in the order they came: the SDP exchanges are async.
       let queue = Promise.resolve();

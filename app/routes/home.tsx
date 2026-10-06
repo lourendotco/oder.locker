@@ -231,7 +231,7 @@ export default function Home({}: Route.ComponentProps) {
           key="signup"
           method="post"
           encType="multipart/form-data"
-          aria-labelledby="auth-heading"
+          aria-labelledby="page-title"
           className="flex flex-col items-center gap-2"
           onSubmit={(e) => {
             // the picked file is replaced by its cropped, re-encoded version
@@ -246,7 +246,7 @@ export default function Home({}: Route.ComponentProps) {
         >
           <input type="hidden" name="signupToken" value={current.signupToken} />
           <h1
-            id="auth-heading"
+            id="page-title"
             className="translate-y-1 text-lg font-medium text-secondary"
           >
             almost there
@@ -336,12 +336,12 @@ export default function Home({}: Route.ComponentProps) {
           <fetcher.Form
             key="code"
             method="post"
-            aria-labelledby="auth-heading"
+            aria-labelledby="page-title"
             className="flex flex-col items-center gap-2"
           >
             <input type="hidden" name="email" value={email} />
             <h1
-              id="auth-heading"
+              id="page-title"
               className="w-80 translate-y-1 text-center text-lg font-medium text-secondary"
             >
               enter the code we sent to
@@ -436,11 +436,11 @@ export default function Home({}: Route.ComponentProps) {
         <fetcher.Form
           key="email"
           method="post"
-          aria-labelledby="auth-heading"
+          aria-labelledby="page-title"
           className="flex flex-col items-center gap-2"
         >
           <h1
-            id="auth-heading"
+            id="page-title"
             className="translate-y-1 text-lg font-medium text-secondary"
           >
             sign up or login

@@ -58,7 +58,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
       {/* Shell provides the <main> landmark. */}
       <div className="pt-16 p-4 container mx-auto">
         <title>{`oder.locker - ${message}`}</title>
-        <h1>{message}</h1>
+        <h1 id="page-title">{message}</h1>
         <p>{details}</p>
         {stack && (
           <pre className="w-full p-4 overflow-x-auto">

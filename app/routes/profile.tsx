@@ -20,7 +20,9 @@ export default function Profile({ loaderData: user }: Route.ComponentProps) {
         <div className="py-2.5">
           <div className="flex items-center justify-between font-antonio">
             <div>
-              <h1 className="text-4xl leading-none">{user.username}</h1>
+              <h1 id="page-title" className="text-4xl leading-none">
+                {user.username}
+              </h1>
               {user.name && (
                 <p className="pl-0.5 text-neutral-600">{user.name}</p>
               )}

@@ -356,7 +356,10 @@ function ThemeChat() {
     <PageTransition>
       <div className="-mx-2.5 -mt-2 flex flex-1 flex-col gap-2 px-1.5 pt-5 pr-9 pb-10">
         <div className="-mr-9 -ml-1.5 pb-2 text-[13px] font-medium text-gray-700">
-          <h1 className="mx-auto w-fit rounded bg-white px-1 text-lg shadow-xs">
+          <h1
+            id="page-title"
+            className="mx-auto w-fit rounded bg-white px-1 text-lg shadow-xs"
+          >
             This week
           </h1>
         </div>

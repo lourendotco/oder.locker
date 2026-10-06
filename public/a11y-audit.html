@@ -196,11 +196,16 @@
   <ul class="cards">
     <li><span class="n">0</span><span class="l">Critical</span></li>
     <li><span class="n">3</span><span class="l">High</span></li>
-    <li><span class="n">10</span><span class="l">Medium</span></li>
+    <li><span class="n">9</span><span class="l">Medium, open</span></li>
     <li><span class="n">12</span><span class="l">Low</span></li>
+    <li><span class="n">1</span><span class="l">Fixed since the audit (M1)</span></li>
   </ul>
 
-  <p><strong>On route changes:</strong> the app runs React Router 8.4.0 in framework mode with server rendering. React Router itself does nothing for focus or announcements, but the app adds its own handling in <code>Shell.tsx</code>, which moves focus to <code>&lt;main&gt;</code> whenever the pathname changes. Page titles are set per route, but nothing announces them: there is no route announcer and no <code>aria-live</code> region tied to navigation. What a screen reader actually says when focus lands on the unnamed <code>&lt;main&gt;</code> varies by product and requires manual verification. Details are in <a href="#routes">Route-change accessibility</a>.</p>
+  <p><strong>On route changes:</strong> the app runs React Router 8.4.0 in framework mode with server rendering. React Router itself does nothing for focus or announcements, but the app adds its own handling in <code>Shell.tsx</code>, which moves focus to <code>&lt;main&gt;</code> whenever the pathname changes. Page titles are set per route, but nothing announces them: there is no route announcer and no <code>aria-live</code> region tied to navigation. At the time of the audit <code>&lt;main&gt;</code> had no accessible name; that has since been fixed by naming it after the page's <code>&lt;h1&gt;</code> (<a href="#m1">M1</a>). What each screen reader actually says when focus lands there still requires manual verification. Details are in <a href="#routes">Route-change accessibility</a>.</p>
+
+  <div class="note">
+    <p><strong>Update after the audit.</strong> Finding M1 has been applied in the code. The fix added a few lines, so line references written before it are now slightly off in five files: add 4 after line 51 of <code>Shell.tsx</code>, 3 after line 359 of <code>theme.tsx</code>, 3 after line 20 of <code>weeks.tsx</code>, 5 after line 10 of <code>privacy.tsx</code> and 2 after line 23 of <code>profile.tsx</code>. References inside M1 and the route-change answers have been brought up to date; the rest are as audited.</p>
+  </div>
 </section>
 
 <!-- ============================================================ -->
@@ -279,7 +284,7 @@
   <div class="qa">
     <h3>3. Does this application deliberately move focus after navigation?</h3>
     <p class="answer">Yes. <code>Shell.tsx:14-20</code> focuses <code>&lt;main&gt;</code> when the pathname changes.</p>
-    <p>The effect compares the current <code>pathname</code> from <code>useLocation()</code> with the previous one. When they differ, and focus is not already inside <code>&lt;main&gt;</code>, it calls <code>main.focus({ preventScroll: true })</code>. <code>&lt;main&gt;</code> has <code>tabIndex={-1}</code> and <code>outline-none</code> (<code>Shell.tsx:48-53</code>). The code comment states the intent: do not leave focus on the followed link or nowhere, and do not steal it from a page that used <code>autoFocus</code>.</p>
+    <p>The effect compares the current <code>pathname</code> from <code>useLocation()</code> with the previous one. When they differ, and focus is not already inside <code>&lt;main&gt;</code>, it calls <code>main.focus({ preventScroll: true })</code>. <code>&lt;main&gt;</code> has <code>tabIndex={-1}</code> and <code>outline-none</code> (<code>Shell.tsx:48-57</code>). The code comment states the intent: do not leave focus on the followed link or nowhere, and do not steal it from a page that used <code>autoFocus</code>.</p>
     <p>What follows from the code:</p>
     <ul>
       <li>It covers link clicks, back/forward, and redirects that end on a different pathname, including the sign-in redirect to <code>/theme</code>.</li>
@@ -287,7 +292,7 @@
       <li>It does not run on full document loads: first visit, and sign-out, which uses <code>redirectDocument</code> (<code>logout.tsx:10</code>). The browser's own page-load behaviour applies there, which is correct.</li>
       <li>It does not run when the root <code>ErrorBoundary</code> takes over, because that renders a second, freshly mounted <code>Shell</code> whose “previous pathname” starts equal to the current one (<a href="#l5">finding L5</a>).</li>
       <li>It does not cover step changes inside <code>/</code> (email → code → sign-up), which happen without a URL change. The code and sign-up steps handle this with <code>autoFocus</code>; going back to the email step does not (<a href="#m2">finding M2</a>).</li>
-      <li><code>&lt;main&gt;</code> has no accessible name, and no visible focus indicator when focused this way (<a href="#m1">finding M1</a>).</li>
+      <li><code>&lt;main&gt;</code> is now named by the page's <code>&lt;h1&gt;</code> through <code>aria-labelledby="page-title"</code> (<code>Shell.tsx:55</code>), so the focus move carries the page name. It had no name when audited (<a href="#m1">finding M1</a>, fixed). It still shows no visible focus indicator when focused this way.</li>
     </ul>
     <p><span class="tag t-manual">Requires manual verification</span> Whether the effect fires at the right moment relative to the view transition, and what each screen reader says when focus lands on <code>&lt;main&gt;</code>.</p>
   </div>
@@ -302,7 +307,7 @@
       <li><code>home.tsx:291, 326, 369, 475</code>: <code>role="alert"</code> for form errors; <code>home.tsx:375</code>: <code>role="status"</code> for “requested a new code”.</li>
       <li><code>Discussion.tsx:305, 345, 416</code>: <code>role="status"</code>; <code>:332</code>: <code>role="alert"</code>; <code>:324</code>: <code>role="timer"</code>.</li>
     </ul>
-    <p>The <code>Shell</code> component and both layout files contain no live region, and the framework supplies none. The only signal a screen-reader user gets on navigation is whatever their screen reader says when focus moves to <code>&lt;main&gt;</code>.</p>
+    <p>The <code>Shell</code> component and both layout files contain no live region, and the framework supplies none. The only signal a screen-reader user gets on navigation is whatever their screen reader says when focus moves to <code>&lt;main&gt;</code>. Since the M1 fix that should include the page's heading, because the heading is now the landmark's name. This is a focus announcement, not a live region.</p>
   </div>
 
   <h3>What was inspected</h3>
@@ -391,7 +396,7 @@
   </div>
 
   <div class="note">
-    <p><strong>Assessment.</strong> The focus handling is a sound baseline and already ahead of the framework default. The gap is the announcement: focus lands on a container with no name, so the user learns that something changed but not what. The smallest robust fix is to focus the new page's <code>&lt;h1&gt;</code> instead of <code>&lt;main&gt;</code>, or to give <code>&lt;main&gt;</code> an <code>aria-labelledby</code> pointing at it. See <a href="#m1">M1</a>.</p>
+    <p><strong>Assessment.</strong> The focus handling is a sound baseline and already ahead of the framework default. The gap found by the audit was the announcement: focus landed on a container with no name, so the user learned that something changed but not what. That gap has been closed in code by giving <code>&lt;main&gt;</code> an <code>aria-labelledby</code> that points at the page's <code>&lt;h1&gt;</code>. See <a href="#m1">M1</a>. It has not been tested with a screen reader.</p>
   </div>
 </section>
 
@@ -480,16 +485,28 @@
 
   <article class="finding med" id="m1">
     <h4><span class="fid">M1</span>After navigation, focus lands on an unnamed <code>&lt;main&gt;</code> and the new page is not announced</h4>
-    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Confirmed in source</span><span class="tag t-manual">Requires manual verification</span></p>
+    <p class="tags"><span class="tag t-med">Medium</span><span class="tag t-ok">Fixed in code</span><span class="tag t-manual">Requires manual verification</span></p>
     <dl>
+      <dt>Status</dt>
+      <dd>
+        <p><strong>Fixed after the audit, not yet tested with a screen reader.</strong> What changed:</p>
+        <ul>
+          <li><code>Shell.tsx:55</code>: <code>&lt;main&gt;</code> now has <code>aria-labelledby="page-title"</code>.</li>
+          <li>Every page's <code>&lt;h1&gt;</code> carries <code>id="page-title"</code>: <code>theme.tsx:359-362</code>, <code>profile.tsx:23</code>, <code>weeks.tsx:20-23</code>, <code>privacy.tsx:10-15</code>, the error page at <code>root.tsx:61</code>, and the three sign-in steps at <code>home.tsx:248, 343, 442</code>.</li>
+          <li>On the sign-in page this id replaces <code>auth-heading</code>, so the forms' own <code>aria-labelledby</code> (<code>home.tsx:234, 339, 439</code>) points at the same heading as before.</li>
+        </ul>
+        <p>Only one route is mounted at a time and the sign-in steps are mutually exclusive, so the id stays unique in the document. The focus effect runs after the new route has rendered, so the name resolves to the new heading.</p>
+        <p>Known side effects: on the sign-in page <code>&lt;main&gt;</code> and the form share a name, and on every page the heading text is heard once as the landmark name and again when reading reaches the <code>&lt;h1&gt;</code>. A page added later without the id would leave <code>&lt;main&gt;</code> unnamed again. The missing visible focus indicator on <code>&lt;main&gt;</code> was left as it is.</p>
+      </dd>
       <dt>WCAG</dt><dd>4.1.3 Status Messages, AA (by analogy; a full page change is a change of context); supports 2.4.3 Focus Order, A. 2.4.2 Page Titled is met.</dd>
       <dt>Affected</dt><dd>All client-side navigations (<code>Shell</code>)</dd>
       <dt>Evidence</dt>
       <dd>
+        <p>As audited, before the fix:</p>
         <ul>
           <li><code>Shell.tsx:14-20</code>: focus is moved to <code>&lt;main&gt;</code> on pathname change.</li>
           <li><code>Shell.tsx:48-53</code>: <code>&lt;main id="main" tabIndex={-1} className="… outline-none"&gt;</code>, with no <code>aria-label</code> or <code>aria-labelledby</code>.</li>
-          <li>No live region for navigation exists anywhere (see <a href="#routes">question 4</a>).</li>
+          <li>No live region for navigation exists anywhere (see <a href="#routes">question 4</a>). This is still the case.</li>
         </ul>
       </dd>
       <dt>User impact</dt><dd>A screen-reader user is likely to hear only “main” after following a link, with no page name. Screen readers differ here, and some may begin reading content. Sighted keyboard users get no visible sign of where focus went, though the page change itself is obvious.</dd>
@@ -946,7 +963,7 @@
     <li>Banner, labelled navigation and main landmarks on every page, including the error page (<code>Header.tsx:35, 39</code>; <code>Shell.tsx:48</code>; <code>root.tsx:57</code>).</li>
     <li>Exactly one <code>&lt;h1&gt;</code> per page and no skipped heading levels.</li>
     <li>A distinct title for every page route, and for 404 and error states.</li>
-    <li>Deliberate focus movement after client-side navigation that respects <code>autoFocus</code> (<code>Shell.tsx:14-20</code>).</li>
+    <li>Deliberate focus movement after client-side navigation that respects <code>autoFocus</code> (<code>Shell.tsx:14-20</code>), onto a <code>&lt;main&gt;</code> that is named by the page heading since the M1 fix.</li>
   </ul>
 
   <h3>Names and images</h3>
@@ -993,7 +1010,7 @@
   <h2 id="quick">Quick wins (under an hour)</h2>
   <p>Each of these is a few lines. Together they fit in a single sitting.</p>
   <ol>
-    <li><strong>Name <code>&lt;main&gt;</code> by the page heading</strong> so the existing focus move announces the page (<a href="#m1">M1</a>).</li>
+    <li><strong>Done:</strong> name <code>&lt;main&gt;</code> by the page heading so the existing focus move announces the page (<a href="#m1">M1</a>).</li>
     <li><strong>Focus the email field</strong> after “use another email”, and the file input after “remove picture” (<a href="#m2">M2</a>).</li>
     <li><strong>Add <code>aria-invalid</code></strong> to the email and username fields (<a href="#l1">L1</a>).</li>
     <li><strong>Add <code>role="list"</code></strong> to the discussion questions (<a href="#l2">L2</a>).</li>
@@ -1027,7 +1044,7 @@
 
   <h3>Phase 3: announcements</h3>
   <ol>
-    <li>Route changes: label <code>&lt;main&gt;</code> or focus the heading; consider a title announcer (<a href="#m1">M1</a>, <a href="#l5">L5</a>).</li>
+    <li>Route changes: <code>&lt;main&gt;</code> is now labelled by the heading (<a href="#m1">M1</a>, done). Still open: verify it with screen readers, handle the error page (<a href="#l5">L5</a>), and consider a title announcer if the testing shows gaps.</li>
     <li>Discussion widget: one persistent status element covering search, connection, extend prompt and ending (<a href="#h3">H3</a>, <a href="#m5">M5</a>).</li>
     <li>Chat: shorten what the live regions announce, render the hint when relevant, scroll once per voice (<a href="#m10">M10</a>).</li>
     <li>Reword position-based instructions (<a href="#m7">M7</a>).</li>
@@ -1063,7 +1080,8 @@
 
   <h3>Route changes with a screen reader</h3>
   <ul class="check">
-    <li><label><input type="checkbox" data-k="r1"><span>Follow each header link: write down exactly what is spoken. Is the new page named?</span></label></li>
+    <li><label><input type="checkbox" data-k="r1"><span>Follow each header link: write down exactly what is spoken. Is the new page named by its heading (the M1 fix)?</span></label></li>
+    <li><label><input type="checkbox" data-k="r7"><span>On the sign-in page, check that hearing the same name for the main landmark and the form is not confusing, and that the name follows the step (email, code, sign-up).</span></label></li>
     <li><label><input type="checkbox" data-k="r2"><span>Use the browser's back and forward buttons: same question.</span></label></li>
     <li><label><input type="checkbox" data-k="r3"><span>Sign in: after the redirect to <code>/theme</code>, is the page change announced before the chat starts speaking?</span></label></li>
     <li><label><input type="checkbox" data-k="r4"><span>Sign out: the sign-in page is announced as a new page load.</span></label></li>

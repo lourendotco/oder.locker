@@ -7,7 +7,12 @@ export function meta({}: Route.MetaArgs) {
 export default function Privacy() {
   return (
     <div className="flex flex-1 flex-col px-1 pt-1 pb-10">
-      <h1 className="pt-5 pb-5 font-antonio text-4xl leading-none">Privacy</h1>
+      <h1
+        id="page-title"
+        className="pt-5 pb-5 font-antonio text-4xl leading-none"
+      >
+        Privacy
+      </h1>
       <h2 className="font-medium">Bot protection</h2>
       <p className="mt-2 text-sm">
         This site uses Cloudflare Turnstile to tell humans and bots apart.

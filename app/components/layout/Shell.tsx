@@ -49,6 +49,10 @@ export default function Shell({ children }: { children: ReactNode }) {
           id="main"
           ref={main}
           tabIndex={-1}
+          // Named by the page's <h1>, so that moving focus here on a
+          // navigation says which page this is. Every page gives its <h1>
+          // this id.
+          aria-labelledby="page-title"
           className="flex flex-1 flex-col outline-none"
         >
           {children}

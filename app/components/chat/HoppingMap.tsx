@@ -1,33 +1,14 @@
 import { useEffect, useState } from "react";
+import { randomGermanLocation } from "./map/germany";
 import { svgMap, type SvgMap } from "./map/svgmap";
 
-const locations: [number, number][] = [
-  [10.8978, 48.3705],
-  [8.2473, 49.9929],
-  [6.9603, 50.9375],
-  [8.2398, 50.0782],
-  [8.6821, 50.1109],
-  [13.405, 52.52],
-  [12.3731, 51.3397],
-  [6.7735, 51.2277],
-  [7.8494, 48.9977],
-  [11.582, 48.1351],
-  [13.7373, 51.0504],
-  [8.8017, 53.0793],
-  [7.0116, 51.4556],
-  [7.6282, 51.9616],
-  [9.1829, 48.7758],
-  [9.732, 52.3759],
-  [11.0767, 49.4521],
-  [8.4037, 49.0069],
-  [9.9937, 53.5511],
-  [7.4653, 51.5136],
-];
-
-const VIEW = { width: 720, height: 540, zoom: 16 };
+const VIEW = { width: 720, height: 540 };
 const STAY = 4000;
+// change to 4000
 
-export default function DiscussionWidget() {
+/** A map that hops from one place in Germany to the next. It fills the
+    nearest positioned ancestor, which is also what clips it. */
+export default function HoppingMap() {
   // the map on show and, while it fades in, the one underneath it
   const [maps, setMaps] = useState<{ id: number; map: SvgMap }[]>([]);
 
@@ -41,9 +22,11 @@ export default function DiscussionWidget() {
     const next = async () => {
       const id = index++;
       try {
+        const random = Math.random() * 2;
         const map = await svgMap({
-          center: locations[id % locations.length],
+          center: randomGermanLocation(),
           ...VIEW,
+          zoom: Math.random() > 0.2 ? 12 + random : 15,
           signal: abort.signal,
         });
         setMaps((old) => [...old.slice(-1), { id, map }]);
@@ -62,14 +45,11 @@ export default function DiscussionWidget() {
   }, []);
 
   return (
-    <div className="relative -mr-[20px] ml-[10px] aspect-4/3 h-auto scroll-mt-(--header-height) overflow-hidden rounded-[2.5rem] bg-white text-black shadow-md">
+    <div aria-hidden className="absolute inset-0">
       <MapPatterns />
       {maps.map(({ id, map }) => (
         <MapSvg key={id} map={map} />
       ))}
-      <div className="absolute top-5 right-5 flex flex-col items-center text-xl bg-primary text-white px-2 rounded-full">
-        waiting...
-      </div>
     </div>
   );
 }
@@ -82,15 +62,16 @@ function MapPatterns() {
   return (
     <svg aria-hidden width={0} height={0} className="absolute">
       <defs>
-        {/* grass: fine ticks */}
+        {/* grass: horizontal stripes. The pattern's height is the distance from
+            one stripe to the next, the green rect's height the stripe itself */}
         <pattern
           id="map-dash"
-          width={5}
+          width={8}
           height={8}
           patternUnits="userSpaceOnUse"
         >
-          <rect width={5} height={8} fill="#1f1f1f" />
-          <path d="M2.5 1v3" stroke="#fff" strokeWidth={9} />
+          <rect width={8} height={8} fill="#fff" />
+          <rect width={8} height={2} fill="#5cb811" />
         </pattern>
         {/* woods: staggered rings */}
         <pattern
@@ -100,7 +81,20 @@ function MapPatterns() {
           patternUnits="userSpaceOnUse"
         >
           <rect width={14} height={14} fill="#fff" />
-          <g fill="none" stroke="#555" strokeWidth={1}>
+          <g fill="none" stroke="#5cb811" strokeWidth={3}>
+            <circle cx={3.5} cy={3.5} r={1.8} />
+            <circle cx={10.5} cy={10.5} r={1.8} />
+          </g>
+        </pattern>
+        {/* farmland: the woods' rings, in yellow */}
+        <pattern
+          id="map-farmland"
+          width={14}
+          height={14}
+          patternUnits="userSpaceOnUse"
+        >
+          <rect width={14} height={14} fill="#fff" />
+          <g fill="none" stroke="#e6b800" strokeWidth={3}>
             <circle cx={3.5} cy={3.5} r={1.8} />
             <circle cx={10.5} cy={10.5} r={1.8} />
           </g>
@@ -124,7 +118,7 @@ function MapPatterns() {
           patternTransform="rotate(45)"
         >
           <rect width={7} height={7} fill="#000" />
-          <path d="M0 3.5h7" stroke="#fff" strokeWidth={5} />
+          <path d="M0 3.5h7" stroke="#fff" strokeWidth={3} />
         </pattern>
       </defs>
     </svg>
@@ -140,12 +134,13 @@ function MapSvg({ map }: { map: SvgMap }) {
       fill="none"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="absolute inset-0 h-full w-full transition-opacity duration-700 motion-reduce:transition-none starting:opacity-0"
+      className="absolute inset-0 h-full w-full "
       style={{ background: WATER }}
     >
       <path d={map.earth} fill="#fff" />
       <path d={map.grass} fill="url(#map-dash)" />
       <path d={map.wood} fill="url(#map-dots)" />
+      <path d={map.farmland} fill="url(#map-farmland)" />
       <path d={map.cemetery} fill="url(#map-cross)" />
       <path d={map.water} fill={WATER} />
       <path d={map.waterways} stroke="#000" strokeWidth={2} />

@@ -15,8 +15,7 @@ import { PageTransition } from "~/components/layout/PageTransition";
 import { MicrophoneIcon, UserPlusIcon, XIcon } from "@phosphor-icons/react";
 import { scrollToStart } from "~/lib/scroll";
 import { requireUser } from "~/lib/session.server";
-import DiscussionWidget from "~/components/chat/DiscussionWidget";
-import { useSearchParams } from "react-router";
+
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "oder.locker - this week" }];
@@ -318,9 +317,6 @@ function ThemeChat() {
   const captionsRef = useRef<CaptionsRef>(null);
   const captionToggleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const [searchParams] = useSearchParams();
-  const isTesting = searchParams.get("a") === "b";
-
   return (
     <PageTransition>
       {/* The side gutters are in px, not rem, so they don't grow with the
@@ -334,7 +330,7 @@ function ThemeChat() {
             This week
           </h1>
         </div>
-        {isTesting  && <DiscussionWidget />}
+
         <ChatBubble bleed>
           <figure>
             <button
@@ -404,10 +400,7 @@ function ThemeChat() {
               </p>
             </ChatBubble>
           )}
-          <p
-            inert={intro < 3}
-            className={`my-3 -mr-1 pl-2 text-sm text-gray-700 ${afterIntro}`}
-          >
+          <p inert={intro < 3} className={`my-3 -mr-1 pl-2 ${afterIntro}`}>
             Different voices want to join in on the debate. Tap the button in
             the corner to choose who you want to include in your conversation.
           </p>

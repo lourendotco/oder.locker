@@ -15,13 +15,12 @@ export function DiscussInvite() {
   return (
     <div
       inert={!active}
-      className={`mt-3 -mr-1 pl-2 text-sm text-gray-700 ${reveal(active)}`}
+      className={`mt-3 -mr-1 pl-2 ${reveal(active)}`}
     >
       <p>
-        If you would like to, you can add another live user to this
-        conversation, and chat with them about this quote. Click the microphone
-        to start discussing. Or add them later through the button in the corner,
-        by picking the first option.
+        If you would like to, you can add another online user to this
+        conversation. Click the microphone to start discussing, or 
+        select "Discuss with another user" in the voices menu.
       </p>
       <button
         type="button"

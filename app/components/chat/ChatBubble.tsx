@@ -147,7 +147,7 @@ export function ChatBubble({
             {/* rounded-[inherit] + overflow-hidden clips bled content to the
                 bubble's corners without clipping the tail or the emojis. */}
             <div
-              className={`font-grotesk leading-[1.2] wrap-break-word hyphens-auto ${bleed ? "overflow-hidden rounded-[inherit]" : ""}`}
+              className={`font-grotesk leading-[1.3] text-base wrap-break-word hyphens-auto ${bleed ? "overflow-hidden rounded-[inherit]" : ""}`}
             >
               {typing ? (
                 // Real text, not a label: the live region the bubble sits in

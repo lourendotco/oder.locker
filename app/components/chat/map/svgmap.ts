@@ -35,6 +35,7 @@ export type SvgMap = {
   earth: string;
   grass: string;
   wood: string;
+  farmland: string;
   cemetery: string;
   water: string;
   buildings: string;
@@ -77,6 +78,7 @@ export async function svgMap({
     earth: "",
     grass: "",
     wood: "",
+    farmland: "",
     cemetery: "",
     water: "",
     buildings: "",
@@ -140,9 +142,10 @@ export async function svgMap({
         let px = NaN;
         let py = NaN;
         for (const p of ring) {
-          const x = Math.round(ox + p.x * scale);
-          const y = Math.round(oy + p.y * scale);
-          // points that land on the same px add bytes and nothing else
+          // a tenth of a px: whole px make curves and shallow angles wobble
+          const x = Math.round((ox + p.x * scale) * 10) / 10;
+          const y = Math.round((oy + p.y * scale) * 10) / 10;
+          // points that land on the same spot add bytes and nothing else
           if (x === px && y === py) continue;
           d += (Number.isNaN(px) ? "M" : "L") + x + " " + y;
           px = x;
@@ -158,6 +161,7 @@ export async function svgMap({
       const kind = String(f.properties.kind);
       if (GRASS.test(kind)) map.grass += path(f, true);
       else if (WOOD.test(kind)) map.wood += path(f, true);
+      else if (kind === "farmland") map.farmland += path(f, true);
       else if (kind === "cemetery") map.cemetery += path(f, true);
     };
     each("landcover", land);

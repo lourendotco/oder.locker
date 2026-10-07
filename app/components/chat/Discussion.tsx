@@ -6,6 +6,7 @@ import {
   PhoneXIcon,
 } from "@phosphor-icons/react";
 import { useFeed, useFeedItem } from "./feed";
+import HoppingMap from "./HoppingMap";
 import { useDiscussionAudio, useMicrophone } from "./hooks/audioHooks";
 import { useDiscussionSocket } from "./hooks/useDiscussionSocket";
 import { Avatar } from "~/components/layout/Avatar";
@@ -62,6 +63,17 @@ const clock = (ms: number) => {
 
 const round =
   "flex size-10 items-center justify-center rounded-full text-white transition-[scale] active:scale-95";
+
+// The block's frame. Once it is over, it shrinks to a note.
+const NOTE = "rounded-xl p-3 shadow-md";
+const WIDGET =
+  "aspect-4/3 rounded-[2.5rem] border-8 border-white drop-shadow-md";
+// 4:3 is where a conversation starts from: unclipped, it grows with what
+// is in it. The map is clipped to it.
+const FRAME = {
+  live: `${WIDGET} p-3`,
+  map: `${WIDGET} relative overflow-hidden`,
+};
 
 /** A block on the feed that finds another user who is also looking to
     discuss and holds a timed voice conversation with them (see
@@ -145,7 +157,7 @@ function Discussion() {
       ref={root}
       aria-label="Discussion"
       tabIndex={-1}
-      className="-mr-[30px] scroll-mt-(--header-height) rounded-xl bg-white p-3 font-grotesk text-sm leading-[1.3] text-black shadow-md"
+      className={`-mr-[30px] scroll-mt-(--header-height) bg-white font-grotesk text-sm leading-[1.3] text-black ${over ? NOTE : FRAME[phase === "live" ? "live" : "map"]}`}
     >
       {over ? (
         <p role="status" className="text-center text-gray-700">
@@ -249,47 +261,47 @@ function Discussion() {
           ))}
         </div>
       ) : (
-        <div role="status" className="flex flex-col items-center gap-3 py-2">
-          <div className="relative flex size-12 items-center justify-center">
-            {phase === "searching" && (
-              <>
-                <span className="discussion-ring absolute inset-0 rounded-full bg-secondary" />
-                <span className="discussion-ring absolute inset-0 rounded-full bg-secondary" />
-              </>
-            )}
-            <span className="relative flex size-12 items-center justify-center rounded-full bg-secondary text-white">
-              <MicrophoneIcon aria-hidden size={26} weight="fill" />
-            </span>
-          </div>
-          <p className="text-center text-gray-700">
-            {phase === "mic"
-              ? "Allow the microphone to start discussing."
-              : "Looking for someone to discuss with…"}
-          </p>
-          {phase === "searching" && (
-            <>
-              <div
-                aria-hidden
-                className="h-1 w-full overflow-hidden rounded-full bg-neutral-200"
-              >
-                <div
-                  className="h-full origin-left bg-secondary transition-[scale] duration-250 ease-linear"
+        <>
+          <HoppingMap />
+          <div
+            role="status"
+            className="absolute bottom-1.5 left-1/2 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 items-stretch gap-1"
+          >
+            <p className="relative isolate overflow-hidden text-center text-base font-medium rounded-md border-[0.5px] bg-white px-1.5 shadow-xs shadow-black">
+              {phase === "mic" ? (
+                "Allow the microphone to start discussing."
+              ) : (
+                <>
+                  Waiting for a conversation partner
+                  <span aria-hidden>
+                    <span className="waiting-dot">.</span>
+                    <span className="waiting-dot">.</span>
+                    <span className="waiting-dot">.</span>
+                  </span>
+                </>
+              )}
+              {phase === "searching" && (
+                <span
+                  aria-hidden
+                  className="absolute inset-0 -z-10 origin-left bg-neutral-200 transition-[scale] duration-250 ease-linear"
                   style={{
                     scale: `${Math.min(1, Math.max(0, 1 - remaining / SEARCH_MS))} 1`,
                   }}
                 />
-              </div>
+              )}
+            </p>
+
+            {phase === "searching" && (
               <button
                 type="button"
                 aria-keyshortcuts="Escape"
+                aria-label="Stop looking"
                 onClick={socket.leave}
-                className="cursor-pointer text-xs underline underline-offset-4"
-              >
-                stop looking
-              </button>
-            </>
-          )}
-        </div>
+                className="w-[calc(1.5rem+1px)] shrink-0 cursor-pointer rounded-md bg-red-600 shadow-xs shadow-black"
+              />
+            )}
+          </div>
+        </>
       )}
     </section>
   );

@@ -7,13 +7,16 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import { Provider } from "jotai";
 import type { Route } from "./+types/theme";
 import { ChatBubble } from "~/components/chat/ChatBubble";
+import { DiscussInvite } from "~/components/chat/DiscussInvite";
 import { useDiscussion } from "~/components/chat/Discussion";
-import { Feed, useFeed, useFeedItem } from "~/components/chat/feed";
+import { Feed, reveal, useFeed, useFeedItem } from "~/components/chat/feed";
 import { Logo } from "~/components/layout/Logo";
 import { PageTransition } from "~/components/layout/PageTransition";
 import { MicrophoneIcon, UserPlusIcon, XIcon } from "@phosphor-icons/react";
 import { scrollToStart } from "~/lib/scroll";
 import { requireUser } from "~/lib/session.server";
+import DiscussionWidget from "~/components/chat/DiscussionWidget";
+import { useSearchParams } from "react-router";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "oder.locker - this week" }];
@@ -210,9 +213,6 @@ const STATEMENTS: {
   },
 ];
 
-const reveal = (shown: boolean) =>
-  `transition-[translate,opacity] delay-1500 duration-2000 motion-reduce:transition-[opacity] ${shown ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"}`;
-
 function Voice({ id }: { id: AuthorId }) {
   const { active, finish } = useFeedItem({ kind: "voice", id });
   const quotes = STATEMENTS.filter(({ author }) => author === id).flatMap(
@@ -275,40 +275,6 @@ function Voice({ id }: { id: AuthorId }) {
   );
 }
 
-function DiscussInvite() {
-  const { active, finish } = useFeedItem({ kind: "discuss" });
-  const { discussing, start } = useDiscussion();
-
-  // Nothing to wait for: whatever follows can start right away.
-  useEffect(() => {
-    if (active) finish();
-  }, [active]);
-
-  return (
-    <div
-      inert={!active}
-      className={`mt-3 -mr-1 pl-2 text-sm text-gray-700 ${reveal(active)}`}
-    >
-      <p>
-        If you would like to, you can add another live user to this
-        conversation, and chat with them about this quote. Click the microphone
-        to start discussing. Or add them later through the button in the corner,
-        by picking the first option.
-      </p>
-      <button
-        type="button"
-        aria-label="Discuss with another user"
-        // One discussion at a time.
-        disabled={discussing}
-        onClick={start}
-        className="gray-800 mx-auto my-3 block rounded-full bg-secondary p-3 text-white shadow-xs shadow-black transition-[scale,opacity] active:scale-95 disabled:opacity-40"
-      >
-        <MicrophoneIcon aria-hidden size={60} className="" weight="fill" />
-      </button>
-    </div>
-  );
-}
-
 export default function Theme({}: Route.ComponentProps) {
   return (
     <Provider>
@@ -352,11 +318,14 @@ function ThemeChat() {
   const captionsRef = useRef<CaptionsRef>(null);
   const captionToggleTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  const [searchParams] = useSearchParams();
+  const isTesting = searchParams.get("a") === "b";
+
   return (
     <PageTransition>
       {/* The side gutters are in px, not rem, so they don't grow with the
           default font size (see ChatBubble). */}
-      <div className="-mx-2.5 -mt-2 flex flex-1 flex-col gap-2 pt-5 pr-[36px] pb-10 pl-[6px]">
+      <div className="-mx-2.5 -mt-2 flex flex-1 flex-col gap-2 pt-5 pr-[36px] pb-[76px] pl-[6px]">
         <div className="-mr-[36px] -ml-[6px] pb-2 text-[13px] font-medium text-gray-700">
           <h1
             id="page-title"
@@ -365,6 +334,7 @@ function ThemeChat() {
             This week
           </h1>
         </div>
+        {isTesting  && <DiscussionWidget />}
         <ChatBubble bleed>
           <figure>
             <button
@@ -416,7 +386,7 @@ function ThemeChat() {
                 title:
                   "Entwurf eines Gesetzes zur Einführung einer IP-Adressspeicherung und Weiterentwicklung der Befugnisse zur Datenerhebung im Strafverfahren",
                 type: "pdf",
-                lang: "de"
+                lang: "de",
               }}
               lastInGroup
               typing={intro === 2}
@@ -454,9 +424,6 @@ function ThemeChat() {
             <UserPlusIcon aria-hidden size={40} weight="fill" />
           </button>
         )}
-        {/* No padding of its own, so a click whose target is the dialog itself
-            landed on the backdrop. m-auto restores the centering Tailwind's
-            reset removes. */}
         <dialog
           ref={voicesDialog}
           aria-labelledby="voices-title"
@@ -471,7 +438,7 @@ function ThemeChat() {
             }
             setPicked(null);
           }}
-          className="m-auto w-[calc(100%-2rem)] max-w-xs overflow-hidden rounded-2xl bg-white font-grotesk text-black shadow-xl transition-[opacity,scale] duration-200 ease-out backdrop:bg-black/40 motion-reduce:transition-[opacity] starting:open:scale-95 starting:open:opacity-0"
+          className="m-auto w-[calc(100%-32px)] max-w-xs overflow-hidden rounded-2xl bg-white font-grotesk text-black shadow-xl transition-[opacity,scale] duration-200 ease-out backdrop:bg-black/40 motion-reduce:transition-opacity starting:open:scale-95 starting:open:opacity-0"
         >
           <div className="flex max-h-[min(32rem,80dvh)] flex-col">
             <div className="flex items-center gap-2 bg-tertiary/50 py-2 pr-2 pl-4">
@@ -490,9 +457,6 @@ function ThemeChat() {
                 <XIcon aria-hidden size={20} weight="bold" />
               </button>
             </div>
-            {/* The rows clip their content, so the buttons draw their focus
-                ring inside their own box. Inside a button only phrasing
-                content is valid, hence the spans. */}
             <ul
               // Safari drops the list semantics of a list without markers.
               role="list"
@@ -575,7 +539,6 @@ function ThemeChat() {
           </div>
         </dialog>
         <Feed />
-
         <Lightbox
           open={lightboxOpen}
           close={() => setLightboxOpen(false)}
@@ -590,7 +553,6 @@ function ThemeChat() {
           ]}
           plugins={[Captions, Zoom]}
           captions={{ ref: captionsRef, descriptionTextAlign: "center" }}
-          // Same window for mouse as for touch (the mouse default is 500ms).
           zoom={{
             doubleTapDelay: DOUBLE_TAP_DELAY,
             doubleClickDelay: DOUBLE_TAP_DELAY,
@@ -639,8 +601,6 @@ function ThemeChat() {
           // A single slide: no prev/next buttons and no swiping to a copy.
           // padding: 0 lets the picture reach the screen edges.
           carousel={{ finite: true, padding: 0 }}
-          // Swipe to dismiss. Only active when not zoomed in: Zoom keeps the
-          // drag for panning otherwise. The backdrop fade is in app.css.
           controller={{
             closeOnPullUp: true,
             closeOnPullDown: true,

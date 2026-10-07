@@ -129,9 +129,7 @@ export async function action({ request }: Route.ActionArgs): Promise<Result> {
     throw redirect(next, { headers: sessionHeaders(token) });
   }
 
-  // Off the response path and answered the same way whatever happens, so
-  // nothing here tells an existing account from a new one, or a sent code from
-  // one the limiter refused.
+  // avoid enumeration
   waitUntil(authIssueOtp(email));
   return {
     step: "code",
@@ -423,8 +421,6 @@ export default function Home({}: Route.ComponentProps) {
               use another email
             </button>
           </div>
-          {/* The same for everyone, whatever state their codes are in: it
-              explains the rules without saying which of them applies. */}
           <p className="w-80 pt-2 text-xs text-neutral-600">
             No email? To prevent spam we invalidate codes and stop sending emails after a few attempts. If you got the code wrong or missed the email, try again later.&nbsp;
             <Link to="/privacy" className="underline font-medium">

@@ -6,14 +6,10 @@ import {
   PhoneXIcon,
 } from "@phosphor-icons/react";
 import { useFeed, useFeedItem } from "./feed";
+import { useDiscussionAudio, useMicrophone } from "./hooks/audioHooks";
+import { useDiscussionSocket } from "./hooks/useDiscussionSocket";
 import { Avatar } from "~/components/layout/Avatar";
-import {
-  EXTEND_WINDOW_MS,
-  SEARCH_MS,
-  type ClientMessage,
-  type OverReason,
-  type ServerMessage,
-} from "~/lib/discussion";
+import { EXTEND_WINDOW_MS, SEARCH_MS, type OverReason } from "~/lib/discussion";
 import { scrollToStart } from "~/lib/scroll";
 
 const QUESTIONS = [
@@ -38,8 +34,6 @@ const OVER_TEXT: Record<Over, string> = {
   error: "The connection was lost.",
 };
 
-type Conversation = Extract<ServerMessage, { type: "state" }>;
-
 // Whether a discussion block has yet to run its course: there is only ever
 // one of those on the feed.
 const discussingAtom = atom(false);
@@ -61,20 +55,6 @@ export function useDiscussion() {
   };
 }
 
-// Resolves once the connection has its network candidates, or after a second:
-// the SFU is publicly reachable, so the rest can be found on the way.
-function candidatesGathered(pc: RTCPeerConnection) {
-  return new Promise<void>((resolve) => {
-    if (pc.iceGatheringState === "complete") return resolve();
-    const timer = setTimeout(resolve, 1000);
-    pc.addEventListener("icegatheringstatechange", () => {
-      if (pc.iceGatheringState !== "complete") return;
-      clearTimeout(timer);
-      resolve();
-    });
-  });
-}
-
 const clock = (ms: number) => {
   const seconds = Math.max(0, Math.ceil(ms / 1000));
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -90,21 +70,26 @@ function Discussion() {
   const { finish } = useFeedItem({ kind: "discussion" });
   const setDiscussing = useSetAtom(discussingAtom);
 
-  const [phase, setPhase] = useState<"mic" | "searching" | "live">("mic");
-  const [over, setOver] = useState<Over | null>(null);
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  // performance.now() at which the search or the conversation runs out.
-  const [deadline, setDeadline] = useState(0);
-  const [now, setNow] = useState(() => performance.now());
-  const [muted, setMuted] = useState(false);
-  const [audioFailed, setAudioFailed] = useState(false);
-  // What the others are saying, one stream per participant.
-  const [voices, setVoices] = useState<MediaStream[]>([]);
+  // The socket waits for the microphone, the audio needs both.
+  const microphone = useMicrophone();
+  const socket = useDiscussionSocket(!!microphone.stream);
+  const audio = useDiscussionAudio(microphone.stream, socket);
 
+  const { conversation } = socket;
+  const over: Over | null = microphone.refused ? "mic" : socket.over;
+  const phase = !microphone.stream
+    ? "mic"
+    : conversation
+      ? "live"
+      : "searching";
+
+  const [now, setNow] = useState(() => performance.now());
   const root = useRef<HTMLElement>(null);
-  const microphone = useRef<MediaStream>(null);
-  const hangUp = useRef<() => void>(null);
-  const extend = useRef<() => void>(null);
+
+  useEffect(() => {
+    setDiscussing(!over);
+    return () => setDiscussing(false);
+  }, [over]);
 
   // It can take ten minutes: the blocks after it don't wait.
   useEffect(() => finish(), []);
@@ -124,145 +109,6 @@ function Discussion() {
     }
   }, [phase, over]);
 
-  useEffect(() => {
-    let gone = false;
-    let ws: WebSocket | undefined;
-    let pc: RTCPeerConnection | undefined;
-    let stream: MediaStream | undefined;
-    // Publishing has started / the connection to the SFU is up.
-    let publishing = false;
-    let connected = false;
-    // A pull is awaiting its offer or the server's "ready": one at a time.
-    let pulling = false;
-    // Whose microphones have been asked for, and who is there to ask.
-    const pulled = new Set<number>();
-    let latest: Conversation | undefined;
-
-    setDiscussing(true);
-
-    const release = () => {
-      gone = true;
-      ws?.close();
-      pc?.close();
-      stream?.getTracks().forEach((track) => track.stop());
-    };
-    const end = (reason: Over) => {
-      if (gone) return;
-      release();
-      setOver(reason);
-      setVoices([]);
-      setDiscussing(false);
-    };
-    hangUp.current = () => end("self");
-
-    const say = (message: ClientMessage) => ws?.send(JSON.stringify(message));
-    extend.current = () => say({ type: "extend" });
-
-    const publish = async () => {
-      publishing = true;
-      pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
-        bundlePolicy: "max-bundle",
-      });
-      pc.addEventListener("track", ({ track }) =>
-        setVoices((voices) => [...voices, new MediaStream([track])]),
-      );
-      // Only now can the others pull this microphone, and this end pull
-      // theirs: the SFU refuses both on a connection that isn't up.
-      pc.addEventListener("connectionstatechange", () => {
-        if (pc?.connectionState === "failed") setAudioFailed(true);
-        if (pc?.connectionState !== "connected" || connected) return;
-        connected = true;
-        say({ type: "connected" });
-        pull();
-      });
-      const transceiver = pc.addTransceiver(stream!.getAudioTracks()[0], {
-        direction: "sendonly",
-      });
-      await pc.setLocalDescription(await pc.createOffer());
-      await candidatesGathered(pc);
-      if (gone) return;
-      say({
-        type: "publish",
-        sdp: pc.localDescription!.sdp,
-        mid: transceiver.mid!,
-      });
-    };
-
-    // can i do all of this server side?
-    // Asks for the microphones that have come up since the last time.
-    const pull = () => {
-      if (!connected || pulling || !latest) return;
-      const ids = latest.participants
-        .filter(({ id, live }) => live && id !== latest!.you && !pulled.has(id))
-        .map(({ id }) => id);
-      if (!ids.length) return;
-      pulling = true;
-      ids.forEach((id) => pulled.add(id));
-      say({ type: "pull", ids });
-    };
-
-    const receive = async (message: ServerMessage) => {
-      if (message.type === "waiting") {
-        setPhase("searching");
-        setDeadline(performance.now() + message.remaining);
-      } else if (message.type === "state") {
-        latest = message;
-        setPhase("live");
-        setConversation(message);
-        setDeadline(performance.now() + message.remaining);
-        if (!publishing) await publish();
-        pull();
-      } else if (message.type === "published") {
-        await pc!.setRemoteDescription({ type: "answer", sdp: message.sdp });
-      } else if (message.type === "offer") {
-        await pc!.setRemoteDescription({ type: "offer", sdp: message.sdp });
-        await pc!.setLocalDescription(await pc!.createAnswer());
-        say({ type: "answer", sdp: pc!.localDescription!.sdp });
-      } else if (message.type === "ready") {
-        pulling = false;
-        pull();
-      } else if (message.type === "audio-failed") {
-        setAudioFailed(true);
-      } else if (message.type === "over") {
-        end(message.reason);
-      }
-    };
-
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        return end("mic");
-      }
-      if (gone) return stream.getTracks().forEach((track) => track.stop());
-      microphone.current = stream;
-
-      ws = new WebSocket(
-        `${import.meta.env.PROD ? "wss" : "ws"}://${location.host}/discuss`,
-      );
-      // One at a time, in the order they came: the SDP exchanges are async.
-      let queue = Promise.resolve();
-      ws.addEventListener("message", ({ data }) => {
-        queue = queue
-          .then(() => (gone ? undefined : receive(JSON.parse(data))))
-          .catch((e) => {
-            console.error(e);
-            setAudioFailed(true);
-          });
-      });
-      // After whatever is still queued, which may be the reason it closed.
-      ws.addEventListener("close", () => queue.then(() => end("error")));
-      setPhase("searching");
-      setDeadline(performance.now() + SEARCH_MS);
-    })();
-
-    return () => {
-      release();
-      setDiscussing(false);
-    };
-  }, []);
-
   const running = !over && phase !== "mic";
   useEffect(() => {
     if (!running) return;
@@ -279,13 +125,13 @@ function Discussion() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (document.querySelector("dialog:modal")) return;
-      hangUp.current?.();
+      socket.leave();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [searching]);
 
-  const remaining = deadline - now;
+  const remaining = socket.deadline - now;
   const others = conversation?.participants.filter(
     ({ id }) => id !== conversation.you,
   );
@@ -328,7 +174,7 @@ function Discussion() {
               {clock(remaining)}
             </p>
           </div>
-          {audioFailed && (
+          {audio.failed && (
             <p role="alert" className="text-red-600">
               The audio couldn’t connect.
             </p>
@@ -356,13 +202,7 @@ function Discussion() {
                 <button
                   type="button"
                   onClick={() => {
-                    // Shown as agreed right away; the server's next state
-                    // confirms it.
-                    setConversation({
-                      ...conversation,
-                      votes: [...conversation.votes, conversation.you],
-                    });
-                    extend.current?.();
+                    socket.extend();
                     // The button goes away: don't let focus go with it.
                     root.current?.focus({ preventScroll: true });
                   }}
@@ -379,15 +219,11 @@ function Discussion() {
               // The name stays put and aria-pressed carries the state: a
               // name that flips as well reads as "Unmute, pressed".
               aria-label="Mute microphone"
-              aria-pressed={muted}
-              onClick={() => {
-                const track = microphone.current?.getAudioTracks()[0];
-                if (track) track.enabled = muted;
-                setMuted(!muted);
-              }}
-              className={`${round} ${muted ? "bg-gray-400" : "bg-secondary"}`}
+              aria-pressed={audio.muted}
+              onClick={audio.toggleMute}
+              className={`${round} ${audio.muted ? "bg-gray-400" : "bg-secondary"}`}
             >
-              {muted ? (
+              {audio.muted ? (
                 <MicrophoneSlashIcon aria-hidden size={22} weight="fill" />
               ) : (
                 <MicrophoneIcon aria-hidden size={22} weight="fill" />
@@ -396,13 +232,13 @@ function Discussion() {
             <button
               type="button"
               aria-label="Leave the conversation"
-              onClick={() => hangUp.current?.()}
+              onClick={socket.leave}
               className={`${round} bg-red-600`}
             >
               <PhoneXIcon aria-hidden size={22} weight="fill" />
             </button>
           </div>
-          {voices.map((voice) => (
+          {audio.voices.map((voice) => (
             <audio
               key={voice.id}
               autoPlay
@@ -446,7 +282,7 @@ function Discussion() {
               <button
                 type="button"
                 aria-keyshortcuts="Escape"
-                onClick={() => hangUp.current?.()}
+                onClick={socket.leave}
                 className="cursor-pointer text-xs underline underline-offset-4"
               >
                 stop looking

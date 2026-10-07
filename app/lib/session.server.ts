@@ -63,9 +63,9 @@ export async function getUser(request: Request): Promise<User | null> {
 }
 
 /** For loaders of signed-in-only pages: sends everyone else to sign in, and back after. */
-export async function requireUser(request: Request): Promise<User> {
+export async function requireUser(request: Request, url: URL): Promise<User> {
   const user = await getUser(request);
   if (user) return user;
-  const { pathname, search } = new URL(request.url);
-  throw redirect(`/?next=${encodeURIComponent(pathname + search)}`);
+  // url, not request.url: on a client navigation the request is for /theme.data
+  throw redirect(`/?next=${encodeURIComponent(url.pathname + url.search)}`);
 }

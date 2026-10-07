@@ -9,8 +9,8 @@ export function meta({}: Route.MetaArgs) {
   return [{ title: "oder.locker - your profile" }];
 }
 
-export function loader({ request }: Route.LoaderArgs) {
-  return requireUser(request);
+export function loader({ request, url }: Route.LoaderArgs) {
+  return requireUser(request, url);
 }
 
 export default function Profile({ loaderData: user }: Route.ComponentProps) {

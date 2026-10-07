@@ -36,20 +36,29 @@ export default function Header({ step = 0 }) {
       ref={ref}
       className="sticky top-0 left-0 z-20 -mx-2.5 [view-transition-name:header] bg-linear-to-b from-neutral-100 from-80% to-transparent px-2.5 pt-2.5 pb-4"
     >
-      <nav aria-label="Main" className="flex items-center justify-between">
+      {/* The avatar and the logo are sized in rem. With a large default font
+          size the three no longer fit side by side, so the logo is the one
+          that gives way (min-w-0 on its link, max-w-full on itself). */}
+      <nav
+        aria-label="Main"
+        className="flex items-center justify-between gap-2"
+      >
         {/* signed out: same-sized blanks on either side keep the logo centred */}
         {user ? (
-          <Link to="/profile" aria-label="Your profile">
+          <Link to="/profile" aria-label="Your profile" className="shrink-0">
             <Avatar user={user} className="h-10 w-10 text-xl" />
           </Link>
         ) : (
-          <span className="h-10 w-10" />
+          <span className="h-10 w-10 shrink-0" />
         )}
-        <Link to="/" aria-label="oder, home">
-          <Logo aria-hidden className="w-30 drop-shadow-sm drop-shadow-white" />
+        <Link to="/" aria-label="oder, home" className="min-w-0">
+          <Logo
+            aria-hidden
+            className="w-30 max-w-full drop-shadow-sm drop-shadow-white"
+          />
         </Link>
         {user ? (
-          <Link to="/weeks" aria-label="Previous weeks">
+          <Link to="/weeks" aria-label="Previous weeks" className="shrink-0">
             <ClockCounterClockwiseIcon
               aria-hidden
               size={35}

@@ -4,8 +4,8 @@ import type { Route } from "./+types/weeks";
 import { PageTransition } from "~/components/layout/PageTransition";
 import { requireUser } from "~/lib/session.server";
 
-export async function loader({ request }: Route.LoaderArgs) {
-  await requireUser(request);
+export async function loader({ request, url }: Route.LoaderArgs) {
+  await requireUser(request, url);
   return null;
 }
 

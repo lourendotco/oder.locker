@@ -19,8 +19,8 @@ export function meta({}: Route.MetaArgs) {
   return [{ title: "oder.locker - this week" }];
 }
 
-export async function loader({ request }: Route.LoaderArgs) {
-  await requireUser(request);
+export async function loader({ request, url }: Route.LoaderArgs) {
+  await requireUser(request, url);
   return null;
 }
 
@@ -33,7 +33,7 @@ const DOUBLE_TAP_DELAY = 300;
 // How long a bubble shows typing dots before its text.
 const TYPING_DELAY = 2000;
 
-const ODER_AVATAR = { avatar: <Logo className="h-6 w-6" /> };
+const ODER_AVATAR = { avatar: <Logo className="size-[24px]" /> };
 
 type ChatBubbleProps = ComponentProps<typeof ChatBubble>;
 
@@ -354,8 +354,10 @@ function ThemeChat() {
 
   return (
     <PageTransition>
-      <div className="-mx-2.5 -mt-2 flex flex-1 flex-col gap-2 px-1.5 pt-5 pr-9 pb-10">
-        <div className="-mr-9 -ml-1.5 pb-2 text-[13px] font-medium text-gray-700">
+      {/* The side gutters are in px, not rem, so they don't grow with the
+          default font size (see ChatBubble). */}
+      <div className="-mx-2.5 -mt-2 flex flex-1 flex-col gap-2 pt-5 pr-[36px] pb-10 pl-[6px]">
+        <div className="-mr-[36px] -ml-[6px] pb-2 text-[13px] font-medium text-gray-700">
           <h1
             id="page-title"
             className="mx-auto w-fit rounded bg-white px-1 text-lg shadow-xs"

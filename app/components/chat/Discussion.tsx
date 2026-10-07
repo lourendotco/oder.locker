@@ -299,7 +299,7 @@ function Discussion() {
       ref={root}
       aria-label="Discussion"
       tabIndex={-1}
-      className="-mr-7.5 scroll-mt-(--header-height) rounded-xl bg-white p-3 font-grotesk text-sm leading-[1.3] text-black shadow-md"
+      className="-mr-[30px] scroll-mt-(--header-height) rounded-xl bg-white p-3 font-grotesk text-sm leading-[1.3] text-black shadow-md"
     >
       {over ? (
         <p role="status" className="text-center text-gray-700">

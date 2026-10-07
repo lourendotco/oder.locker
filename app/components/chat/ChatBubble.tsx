@@ -93,24 +93,28 @@ export function ChatBubble({
 
   return (
     <>
+      {/* The avatar, its gap and the tail are sized in px, not rem: a larger
+          default font size should go to the text, not to the gutter. */}
       <div
-        className={`relative flex items-end gap-2 ${hasEmojis ? "pb-3" : ""}`}
+        className={`relative flex items-end gap-[8px] ${hasEmojis ? "pb-3" : ""}`}
       >
         {/* A box-shadow with drop-shadow-md's values, not the filter: on an
             element that also clips its overflow, the filter's shadow gets
             cut off at random as the chat repaints. */}
         {avatar && (
-          <div className="flex h-6.5 w-6.5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_3px_3px_rgb(0_0_0/0.12)]">
+          <div className="flex size-[26px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-[0_3px_3px_rgb(0_0_0/0.12)]">
             {avatar}
           </div>
         )}
         {/* The drop-shadow lives on a wrapper whose own box reaches down past
             the overhanging emojis (pb-3.5, cancelled by -mb-3.5 so layout is
             unchanged). WebKit sizes the filter region from the filtered
-            element's box, so anything hanging outside it loses its shadow. */}
+            element's box, so anything hanging outside it loses its shadow.
+            min-w-0 lets it get narrower than its longest word, which then
+            breaks instead of pushing the bubble off the screen. */}
         <div
           ref={bubbleRef}
-          className={`bubble-pop-in drop-shadow-md ${avatar ? "" : "ml-8.5"} ${hasEmojis ? "-mb-3.5 pb-3.5" : ""}`}
+          className={`bubble-pop-in min-w-0 drop-shadow-md ${avatar ? "" : "ml-[34px]"} ${hasEmojis ? "-mb-3.5 pb-3.5" : ""}`}
         >
           <div
             className={`relative rounded-xl bg-white text-black! ${bleed ? "" : `px-2.5 pt-1.5 ${hasEmojis ? "pb-4" : "pb-2"}`} text-sm text-white`}
@@ -119,7 +123,7 @@ export function ChatBubble({
               <svg
                 viewBox="-6 -24 30 24"
                 aria-hidden
-                className="absolute bottom-0 -left-1.5 h-6 w-[30px] fill-white"
+                className="absolute bottom-0 -left-[6px] h-[24px] w-[30px] fill-white"
               >
                 <path d="M0-24V-11C0-7.5-3.5-3.5-5.5-1Q-6.2 0-5 0C-2 0 3-3.5 7.5-3.5C11-3.5 12.5-.5 15 0H24V-1A23 23 0 0 1 1-24Z" />
               </svg>
@@ -143,7 +147,7 @@ export function ChatBubble({
             {/* rounded-[inherit] + overflow-hidden clips bled content to the
                 bubble's corners without clipping the tail or the emojis. */}
             <div
-              className={`font-grotesk leading-[1.2] ${bleed ? "overflow-hidden rounded-[inherit]" : ""}`}
+              className={`font-grotesk leading-[1.2] wrap-break-word hyphens-auto ${bleed ? "overflow-hidden rounded-[inherit]" : ""}`}
             >
               {typing ? (
                 // Real text, not a label: the live region the bubble sits in

@@ -2,6 +2,8 @@
 // domain) simplified to ~5km. Islands are left out, and towns right on the
 // border may fall on either side.
 // prettier-ignore
+// https://chatgpt.com/share/6ac74408-8188-83eb-914a-e82094d4ca28
+
 const OUTLINE: [number, number][] = [
   [9.52, 47.52], [8.57, 47.78], [8.4, 47.69], [8.57, 47.64], [8.43, 47.59], [7.57, 47.61],
   [7.62, 48.16], [7.84, 48.64], [8.14, 48.89], [8.13, 48.97], [7.45, 49.15], [6.74, 49.16],

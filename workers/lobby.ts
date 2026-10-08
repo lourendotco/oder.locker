@@ -8,7 +8,7 @@ import type { Participant } from "~/lib/discussion";
 // if the user in a conversation was included in the key it could still not prevent this
 //
 
-export class Loby extends DurableObject<Env> {
+export class DiscussionLoby extends DurableObject<Env> {
   async enter(user: Participant): Promise<Response> {
     const { 0: client, 1: server } = new WebSocketPair();
     const [waiter] = this.ctx.getWebSockets();

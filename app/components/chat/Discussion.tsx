@@ -9,9 +9,11 @@ import { useFeed, useFeedItem } from "./feed";
 import HoppingMap from "./HoppingMap";
 import { useDiscussionAudio, useMicrophone } from "./hooks/audioHooks";
 import { useDiscussionSocket } from "./hooks/useDiscussionSocket";
+import { QuestionTicker } from "./QuestionTicker";
 import { Avatar } from "~/components/layout/Avatar";
 import { EXTEND_WINDOW_MS, SEARCH_MS, type OverReason } from "~/lib/discussion";
 import { scrollToStart } from "~/lib/scroll";
+import { countAtom, useOnlineCount } from "./hooks/useOnlineCount";
 
 const QUESTIONS = [
   "What voice do you want to discuss?",
@@ -72,7 +74,7 @@ const WIDGET =
 // is in it. The map is clipped to it.
 const FRAME = {
   live: `${WIDGET} p-3`,
-  map: `${WIDGET} relative overflow-hidden`,
+  map: `${WIDGET} relative overflow-clip`,
 };
 
 /** A block on the feed that finds another user who is also looking to
@@ -81,7 +83,7 @@ const FRAME = {
 function Discussion() {
   const { finish } = useFeedItem({ kind: "discussion" });
   const setDiscussing = useSetAtom(discussingAtom);
-
+  const online = useAtomValue(countAtom);
   // The socket waits for the microphone, the audio needs both.
   const microphone = useMicrophone();
   const socket = useDiscussionSocket(!!microphone.stream);
@@ -157,117 +159,15 @@ function Discussion() {
       ref={root}
       aria-label="Discussion"
       tabIndex={-1}
-      className={`-mr-[30px] scroll-mt-(--header-height) bg-white font-grotesk text-sm leading-[1.3] text-black ${over ? NOTE : FRAME[phase === "live" ? "live" : "map"]}`}
+      className="-mr-[30px] scroll-mt-(--header-height) font-grotesk text-sm leading-[1.3] text-black outline-none"
     >
-      {over ? (
-        <p role="status" className="text-center text-gray-700">
-          {OVER_TEXT[over]}
-        </p>
-      ) : phase === "live" && conversation ? (
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex -space-x-2">
-              {others?.map((user) => (
-                <Avatar
-                  key={user.id}
-                  user={user}
-                  className="size-9 text-lg ring-2 ring-white"
-                />
-              ))}
-            </div>
-            <p className="min-w-0 flex-1 truncate font-medium">
-              {others?.map(({ name, username }) => name ?? username).join(", ")}
-            </p>
-            <p
-              role="timer"
-              className={`font-space text-lg font-medium tabular-nums ${remaining <= EXTEND_WINDOW_MS ? "text-primary" : "text-secondary"}`}
-            >
-              <span className="sr-only">Time left: </span>
-              {clock(remaining)}
-            </p>
-          </div>
-          {audio.failed && (
-            <p role="alert" className="text-red-600">
-              The audio couldn’t connect.
-            </p>
-          )}
-          <ul className="flex flex-col gap-1.5 text-gray-700">
-            {QUESTIONS.map((question) => (
-              <li key={question} className="border-l-2 border-tertiary pl-2">
-                {question}
-              </li>
-            ))}
-          </ul>
-          {canExtend && (
-            <div
-              role="status"
-              className="pop-in flex items-center gap-2 rounded-lg bg-tertiary/20 p-2"
-            >
-              <p className="min-w-0 flex-1">
-                {agreed
-                  ? "Waiting for the others to agree…"
-                  : askedBy?.length
-                    ? `${askedBy.map(({ name, username }) => name ?? username).join(", ")} would like one more minute.`
-                    : "Almost out of time. One more minute?"}
-              </p>
-              {!agreed && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    socket.extend();
-                    // The button goes away: don't let focus go with it.
-                    root.current?.focus({ preventScroll: true });
-                  }}
-                  className="shrink-0 rounded-full bg-primary px-3 py-1 font-medium text-white transition-[scale] active:scale-95"
-                >
-                  Extend
-                </button>
-              )}
-            </div>
-          )}
-          <div className="flex justify-center gap-4">
-            <button
-              type="button"
-              // The name stays put and aria-pressed carries the state: a
-              // name that flips as well reads as "Unmute, pressed".
-              aria-label="Mute microphone"
-              aria-pressed={audio.muted}
-              onClick={audio.toggleMute}
-              className={`${round} ${audio.muted ? "bg-gray-400" : "bg-secondary"}`}
-            >
-              {audio.muted ? (
-                <MicrophoneSlashIcon aria-hidden size={22} weight="fill" />
-              ) : (
-                <MicrophoneIcon aria-hidden size={22} weight="fill" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label="Leave the conversation"
-              onClick={socket.leave}
-              className={`${round} bg-red-600`}
-            >
-              <PhoneXIcon aria-hidden size={22} weight="fill" />
-            </button>
-          </div>
-          {audio.voices.map((voice) => (
-            <audio
-              key={voice.id}
-              autoPlay
-              ref={(audio) => {
-                if (audio && audio.srcObject !== voice) audio.srcObject = voice;
-              }}
-            />
-          ))}
-        </div>
-      ) : (
+      {!over && phase !== "live" && (
         <>
-          <HoppingMap />
           <div
             role="status"
-            className="absolute bottom-1.5 left-1/2 flex w-max max-w-[calc(100%-1rem)] -translate-x-1/2 items-stretch gap-1"
+            className="my-3 mx-3.5 flex items-stretch gap-2 pr-0.5"
           >
-            <p className="relative isolate overflow-hidden text-center text-base font-medium rounded-md border-[0.5px] bg-white px-1.5 shadow-xs shadow-black">
+            <p className="relative isolate grow overflow-hidden rounded-lg bg-white px-3 text-center text-base shadow-md">
               {phase === "mic" ? (
                 "Allow the microphone to start discussing."
               ) : (
@@ -290,18 +190,131 @@ function Discussion() {
                 />
               )}
             </p>
-
             {phase === "searching" && (
               <button
                 type="button"
                 aria-keyshortcuts="Escape"
                 aria-label="Stop looking"
                 onClick={socket.leave}
-                className="w-[calc(1.5rem+1px)] shrink-0 cursor-pointer rounded-md bg-red-600 shadow-xs shadow-black"
+                className="size-6 shrink-0 cursor-pointer rounded-xs bg-red-600 shadow-md"
               />
             )}
           </div>
         </>
+      )}
+      <div
+        className={`bg-white ${over ? NOTE : FRAME[phase === "live" ? "live" : "map"]}`}
+      >
+        {over ? (
+          <p role="status" className="text-center text-gray-700">
+            {OVER_TEXT[over]}
+          </p>
+        ) : phase === "live" && conversation ? (
+          <div className="relative flex flex-col gap-3">
+            <p
+              role="timer"
+              className={`absolute top-0 right-2 font-space text-lg font-medium tabular-nums ${remaining <= EXTEND_WINDOW_MS ? "text-primary" : "text-secondary"}`}
+            >
+              <span className="sr-only">Time left: </span>
+              {clock(remaining)}
+            </p>
+            <div className="flex justify-center gap-4">
+              {others?.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex min-w-0 flex-col items-center"
+                >
+                  <Avatar user={user} className="mb-1 size-16 text-3xl" />
+                  <p className="max-w-full truncate font-medium">
+                    {user.name ?? user.username}
+                  </p>
+                  {user.name && (
+                    <p className="max-w-full truncate text-gray-500">
+                      {user.username}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            {audio.failed && (
+              <p role="alert" className="text-red-600">
+                The audio couldn’t connect.
+              </p>
+            )}
+            <QuestionTicker questions={QUESTIONS} />
+            {canExtend && (
+              <div
+                role="status"
+                className="pop-in flex items-center gap-2 rounded-lg bg-tertiary/20 p-2"
+              >
+                <p className="min-w-0 flex-1">
+                  {agreed
+                    ? "Waiting for the others to agree…"
+                    : askedBy?.length
+                      ? `${askedBy.map(({ name, username }) => name ?? username).join(", ")} would like one more minute.`
+                      : "Almost out of time. One more minute?"}
+                </p>
+                {!agreed && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      socket.extend();
+                      // The button goes away: don't let focus go with it.
+                      root.current?.focus({ preventScroll: true });
+                    }}
+                    className="shrink-0 rounded-full bg-primary px-3 py-1 font-medium text-white transition-[scale] active:scale-95"
+                  >
+                    Extend
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="flex justify-center gap-4">
+              <button
+                type="button"
+                // The name stays put and aria-pressed carries the state: a
+                // name that flips as well reads as "Unmute, pressed".
+                aria-label="Mute microphone"
+                aria-pressed={audio.muted}
+                onClick={audio.toggleMute}
+                className={`${round} ${audio.muted ? "bg-gray-400" : "bg-secondary"}`}
+              >
+                {audio.muted ? (
+                  <MicrophoneSlashIcon aria-hidden size={22} weight="fill" />
+                ) : (
+                  <MicrophoneIcon aria-hidden size={22} weight="fill" />
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label="Leave the conversation"
+                onClick={socket.leave}
+                className={`${round} bg-red-600`}
+              >
+                <PhoneXIcon aria-hidden size={22} weight="fill" />
+              </button>
+            </div>
+            {audio.voices.map((voice) => (
+              <audio
+                key={voice.id}
+                autoPlay
+                ref={(audio) => {
+                  if (audio && audio.srcObject !== voice)
+                    audio.srcObject = voice;
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <HoppingMap />
+        )}
+      </div>
+      {!over && phase === "searching" && online !== null && (
+        <p className="mt-1 pl-2 text-sm text-gray-700">
+          {online === 1
+            ? "There is no one else on this page right now."
+            : `There ${online - 1 > 1 ? "are" : "is"} ${online - 1} other user${online - 1 > 1 ? "s" : ""} on this page.`}
+        </p>
       )}
     </section>
   );

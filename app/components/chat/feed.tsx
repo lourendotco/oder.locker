@@ -23,8 +23,7 @@ const feedEntriesAtom = atom<Record<string, FeedEntry>>({});
 const FeedKey = createContext<string | null>(null);
 
 /** How a block comes in once it is `active`. */
-export const reveal = (shown: boolean) =>
-  `transition-[translate,opacity] delay-1500 duration-2000 motion-reduce:transition-[opacity] ${shown ? "translate-y-0 opacity-100" : "-translate-y-3 opacity-0"}`;
+
 
 export function Feed() {
   const feed = useAtomValue(feedAtom);

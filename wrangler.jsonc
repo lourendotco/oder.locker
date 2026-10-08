@@ -20,6 +20,11 @@
 			{
 				"name": "DISCUSSIONS",
 				"class_name": "Discussions"
+			},
+			// counts the clients that are online (workers/counter.ts)
+			{
+				"name": "ONLINE",
+				"class_name": "OnlineCounter"
 			}
 		]
 	},
@@ -27,6 +32,10 @@
 		{
 			"tag": "v1",
 			"new_sqlite_classes": ["Discussions"]
+		},
+		{
+			"tag": "v2",
+			"new_sqlite_classes": ["OnlineCounter"]
 		}
 	],
 	"d1_databases": [

@@ -7,15 +7,15 @@ import "yet-another-react-lightbox/plugins/captions.css";
 import { Provider } from "jotai";
 import type { Route } from "./+types/theme";
 import { ChatBubble } from "~/components/chat/ChatBubble";
-import { DiscussInvite } from "~/components/chat/DiscussInvite";
 import { useDiscussion } from "~/components/chat/Discussion";
-import { Feed, reveal, useFeed, useFeedItem } from "~/components/chat/feed";
+import { Feed, useFeed, useFeedItem } from "~/components/chat/feed";
 import { Logo } from "~/components/layout/Logo";
 import { PageTransition } from "~/components/layout/PageTransition";
 import { MicrophoneIcon, UserPlusIcon, XIcon } from "@phosphor-icons/react";
 import { scrollToStart } from "~/lib/scroll";
 import { requireUser } from "~/lib/session.server";
-
+import { useOnlineCount } from "~/components/chat/hooks/useOnlineCount";
+import Intro, { HIDE_INTRO_COOKIE } from "~/components/chat/Intro";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "oder.locker - this week" }];
@@ -23,7 +23,11 @@ export function meta({}: Route.MetaArgs) {
 
 export async function loader({ request, url }: Route.LoaderArgs) {
   await requireUser(request, url);
-  return null;
+  const introHidden = !!request.headers
+    .get("cookie")
+    ?.split("; ")
+    .includes(`${HIDE_INTRO_COOKIE}=1`);
+  return { showIntro: !introHidden };
 }
 
 const PICTURE_ALT =
@@ -40,40 +44,48 @@ const ODER_AVATAR = { avatar: <Logo className="size-[24px]" /> };
 type ChatBubbleProps = ComponentProps<typeof ChatBubble>;
 
 // The logos have an empty alt: wherever one shows, the name is next to it.
-// The colors are text on white and keep to a contrast of 4.5:1.
+// The colors are text on white and keep to a contrast of 4.5:1. The names are
+// German, read out as such (lang), as are the names quotes override them with.
 const AUTHORS = {
   gdp: {
     name: "Gewerkschaft der Polizei",
+    lang: "de",
     avatar: <img src="/gdp_logo.avif" alt="" />,
     color: "var(--color-green-700)",
   },
   dieLinke: {
     name: "Die Linke",
+    lang: "de",
     avatar: <img src="/die_linke_logo.jpg" alt="" className="px-0.5" />,
     color: "var(--color-red-600)",
   },
   cdu: {
     name: "CDU",
+    lang: "de",
     avatar: <img src="cdu_logo.png" alt="" className="-translate-y-px px-1" />,
     color: "var(--color-gray-800)",
   },
   verdi: {
     name: "ver.di - Medienbündnis",
+    lang: "de",
     avatar: <img src="verdi_logo.svg" alt="" className="p-0.5" />,
     color: "rgb(208,44,74)",
   },
   bff: {
     name: "Bundesverband Frauenberatungsstellen und Frauennotrufe",
+    lang: "de",
     avatar: <img src="bff_logo.svg" alt="" className="px-0.5" />,
     color: "#07516c",
   },
   dc: {
     name: "digital courage",
+    lang: "de",
     avatar: <img src="dc_logo.svg" alt="" className="translate-x-0.5 p-1" />,
     color: "var(--color-yellow-700)",
   },
   sussner: {
     name: "Petra Sußner - Verfassungsblog",
+    lang: "de",
     avatar: <img src="sußner_logo.jpg" alt="" className="" />,
     color: "black",
   },
@@ -242,12 +254,19 @@ function Voice({ id }: { id: AuthorId }) {
   }, [typed]);
 
   return (
-    // A live region, so each quote is read out as it is typed: nothing else
-    // tells a screen reader that picking a voice added something.
+    // Not a live region: a quote takes longer to read out than the next one
+    // takes to arrive, and VoiceOver dropped each for the next. Focus comes
+    // here instead once the voices dialog closes (see its onClose), to read
+    // on from; the group's name is what is read out on arrival. It has the
+    // name's lang, as an aria-label can't have its own: the English in it
+    // (ChatBubble's, the status) says it is English.
     <div
       id={`voice-${id}`}
-      aria-live="polite"
-      className="flex scroll-mt-(--header-height) flex-col gap-2"
+      role="group"
+      aria-label={AUTHORS[id].name}
+      lang={AUTHORS[id].lang}
+      tabIndex={-1}
+      className="flex scroll-mt-(--header-height) flex-col gap-2 outline-none"
     >
       {quotes.map(
         ({ key, text, name, citation, lastInGroup }, i) =>
@@ -270,35 +289,49 @@ function Voice({ id }: { id: AuthorId }) {
             </ChatBubble>
           ),
       )}
+      {/* Short, so it is read out whole: says when the quotes are all in.
+          Last, so reading on through the group meets it after them. */}
+      <p role="status" lang="en" className="sr-only">
+        {typed === quotes.length && (
+          <>
+            <span lang={AUTHORS[id].lang}>{AUTHORS[id].name}</span> added{" "}
+            {quotes.length} statements
+          </>
+        )}
+      </p>
     </div>
   );
 }
 
-export default function Theme({}: Route.ComponentProps) {
+export default function Theme({ loaderData }: Route.ComponentProps) {
   return (
     <Provider>
-      <ThemeChat />
+      <ThemeChat showIntro={loaderData.showIntro} />
     </Provider>
   );
 }
 
-function ThemeChat() {
+function ThemeChat({ showIntro }: { showIntro: boolean }) {
+  useOnlineCount();
   const [emojis, setEmojis] = useState(["👍", "👎", "😐", "🤷"]);
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  // How far the chat's opening is: 1 the question is being typed, 2 the
-  // summary is being typed, 3 done.
-  const [intro, setIntro] = useState(1);
+  // How far the chat's opening is: 0 the intro dialog is open and the chat
+  // still empty, 1 the picture is in and the question is being typed, 2 the
+  // summary is being typed, 3 done. Starts at 1 once the dialog has been
+  // turned off ("Do not show again").
+  const [intro, setIntro] = useState(showIntro ? 0 : 1);
 
   useEffect(() => {
-    if (intro === 3) return;
+    // Closing the intro dialog is what moves it on from 0.
+    if (intro === 0 || intro >= 3) {
+      return;
+    }
     const timer = setTimeout(
       () => setIntro((intro) => intro + 1),
       TYPING_DELAY,
     );
     return () => clearTimeout(timer);
   }, [intro]);
-
-  const afterIntro = reveal(intro === 3);
 
   const { entries, append } = useFeed();
   const { discussing, start } = useDiscussion();
@@ -331,49 +364,56 @@ function ThemeChat() {
           </h1>
         </div>
 
-        <ChatBubble bleed>
-          <figure>
-            <button
-              type="button"
-              onClick={() => setLightboxOpen(true)}
-              className="block w-full cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary"
-            >
-              <img
-                src="/5025232.webp"
-                alt={PICTURE_ALT}
-                width={900}
-                height={604}
-                className="block w-full"
-              />
-              <span className="sr-only">View full screen</span>
-            </button>
-            <figcaption className="text-center text-[10px] leading-[1.3]">
-              © Deutscher Bundestag / Thomas Imo / phototek
-            </figcaption>
-          </figure>
-        </ChatBubble>
-        {/* A live region, so the opening is read out as it is typed. */}
-        <div aria-live="polite" className="flex flex-col gap-2">
-          <ChatBubble
-            author={ODER_AVATAR}
-            // Has the avatar while it is the last one there.
-            lastInGroup={intro === 1}
-            typing={intro === 1}
-            emojis={emojis}
-            onReact={
-              (emoji) =>
-                setEmojis((emojis) =>
-                  emojis.includes(emoji) ? emojis : [...emojis, emoji],
-                )
-              // this should actually merge emojis which just vary by skin color (picking which to display?)
-            }
-          >
-            <p className="font-medium">
-              Should internet providers be required to store everyone’s IP
-              address for three months so police can identify people suspected
-              of crimes online?
-            </p>
+        {/* Pops in (see ChatBubble) once the intro dialog is closed. */}
+        {intro >= 1 && (
+          <ChatBubble bleed>
+            <figure>
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(true)}
+                className="block w-full cursor-zoom-in focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary"
+              >
+                <img
+                  src="/5025232.webp"
+                  alt={PICTURE_ALT}
+                  width={900}
+                  height={604}
+                  className="block w-full"
+                />
+                <span className="sr-only">View full screen</span>
+              </button>
+              <figcaption className="text-center text-[10px] leading-[1.3]">
+                © Deutscher Bundestag / Thomas Imo / phototek
+              </figcaption>
+            </figure>
           </ChatBubble>
+        )}
+        {/* Not a live region, as a voice's quotes aren't (see Voice): it is
+            read where it stands, and is typed out long before a reader
+            starting at the top gets past the picture. */}
+        <div className="flex flex-col gap-2">
+          {intro >= 1 && (
+            <ChatBubble
+              author={ODER_AVATAR}
+              // Has the avatar while it is the last one there.
+              lastInGroup={intro === 1}
+              typing={intro === 1}
+              emojis={emojis}
+              onReact={
+                (emoji) =>
+                  setEmojis((emojis) =>
+                    emojis.includes(emoji) ? emojis : [...emojis, emoji],
+                  )
+                // this should actually merge emojis which just vary by skin color (picking which to display?)
+              }
+            >
+              <p className="font-medium">
+                Should internet providers be required to store everyone’s IP
+                address for three months so police can identify people suspected
+                of crimes online?
+              </p>
+            </ChatBubble>
+          )}
           {intro >= 2 && (
             <ChatBubble
               author={ODER_AVATAR}
@@ -400,23 +440,19 @@ function ThemeChat() {
               </p>
             </ChatBubble>
           )}
-          <p inert={intro < 3} className={`my-3 -mr-1 pl-2 ${afterIntro}`}>
-            Different voices want to join in on the debate. Tap the button in
-            the corner to choose who you want to include in your conversation.
-          </p>
         </div>
-        {intro >= 3 && (
-          <button
-            type="button"
-            aria-label="Add a voice"
-            aria-haspopup="dialog"
-            onClick={() => voicesDialog.current?.showModal()}
-            // Held back as long as the text explaining it (see reveal).
-            className="pop-in fixed right-3 bottom-3 z-20 rounded-full bg-primary p-1.5 text-white transition-[scale] [--pop-in-delay:1500ms] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black active:scale-95"
-          >
-            <UserPlusIcon aria-hidden size={40} weight="fill" />
-          </button>
-        )}
+
+        <button
+          type="button"
+          aria-label="Add a voice"
+          aria-haspopup="dialog"
+          onClick={() => voicesDialog.current?.showModal()}
+          className="fixed right-3 bottom-3 z-20 rounded-full bg-primary p-1.5 text-white transition-[scale] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black active:scale-95"
+        >
+          <UserPlusIcon aria-hidden size={40} weight="fill" />
+        </button>
+
+        <Intro open={intro === 0} onClose={() => setIntro(1)} />
         <dialog
           ref={voicesDialog}
           aria-labelledby="voices-title"
@@ -427,7 +463,11 @@ function ThemeChat() {
           }}
           onClose={() => {
             if (picked) {
-              scrollToStart(document.getElementById(`voice-${picked}`));
+              const voice = document.getElementById(`voice-${picked}`);
+              scrollToStart(voice);
+              // Over the button that opened the dialog, where closing put it:
+              // the quotes are read on from here.
+              voice?.focus({ preventScroll: true });
             }
             setPicked(null);
           }}
@@ -456,7 +496,6 @@ function ThemeChat() {
               className="overflow-y-auto overscroll-contain"
             >
               <li
-                hidden={!hasVoice}
                 onAnimationEnd={() => voicesDialog.current?.close()}
                 className={`grid grid-rows-[1fr]`}
               >
@@ -509,7 +548,6 @@ function ThemeChat() {
                           setPicked(id);
                           append(
                             <Voice key={`voice-${id}`} id={id} />,
-                            <DiscussInvite key="discuss" />,
                           );
                         }}
                         className="flex min-h-12 w-full items-center gap-3 border-t border-neutral-200 bg-white pl-4 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-secondary active:bg-neutral-100"

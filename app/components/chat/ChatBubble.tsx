@@ -19,8 +19,8 @@ export function ChatBubble({
   children,
 }: {
   /** The name, if any, is shown above the content, in `color` (any CSS
-      color). */
-  author?: { name?: string; avatar: ReactNode; color?: string };
+      color). `lang` is the name's language, when it is not English. */
+  author?: { name?: string; lang?: string; avatar: ReactNode; color?: string };
   /** Last of consecutive bubbles by the same author: shows the author's
       avatar and the bubble's tail. */
   lastInGroup?: boolean;
@@ -128,33 +128,26 @@ export function ChatBubble({
                 <path d="M0-24V-11C0-7.5-3.5-3.5-5.5-1Q-6.2 0-5 0C-2 0 3-3.5 7.5-3.5C11-3.5 12.5-.5 15 0H24V-1A23 23 0 0 1 1-24Z" />
               </svg>
             )}
-            {hasEmojis ? (
-              <button
-                ref={emojisRef}
-                type="button"
-                aria-haspopup="dialog"
-                aria-expanded={pickerOpen}
-                onClick={() => setPickerOpen((open) => !open)}
-                className="absolute right-1 bottom-0 flex translate-y-1/2 gap-1.5 rounded-full bg-white px-2 py-0.5 text-base transition-[scale] active:scale-105 border-t-[0.5px] border-neutral-200"
-              >
-                <span className="sr-only">Reactions:</span>
-                {emojis?.map((emoji) => (
-                  <span key={emoji}>{emoji}</span>
-                ))}
-                <span className="sr-only">. Add a reaction</span>
-              </button>
-            ) : null}
             {/* rounded-[inherit] + overflow-hidden clips bled content to the
                 bubble's corners without clipping the tail or the emojis. */}
             <div
               className={`font-grotesk leading-[1.3] text-base wrap-break-word hyphens-auto ${bleed ? "overflow-hidden rounded-[inherit]" : ""}`}
             >
               {typing ? (
-                // Real text, not a label: the live region the bubble sits in
-                // announces what is added to it.
+                // Real text, not a label: it is what a screen reader reads
+                // where the bubble has yet to be typed out.
                 <p className="flex h-[1.2em] items-center gap-1">
-                  <span className="sr-only">
-                    {author?.name ? `${author.name} is typing…` : "Typing…"}
+                  {/* English, said so for a bubble inside another language
+                      (see Voice); the name in its own. */}
+                  <span lang="en" className="sr-only">
+                    {author?.name ? (
+                      <>
+                        <span lang={author.lang}>{author.name}</span> is
+                        typing…
+                      </>
+                    ) : (
+                      "Typing…"
+                    )}
                   </span>
                   <span
                     aria-hidden
@@ -173,6 +166,7 @@ export function ChatBubble({
                 <>
                   {author?.name && (
                     <p
+                      lang={author.lang}
                       className="pb-1 font-medium text-green-200"
                       style={{ color: author.color }}
                     >
@@ -183,14 +177,46 @@ export function ChatBubble({
                 </>
               )}
             </div>
+            {/* After the content in the DOM, so a screen reader gets to the
+                reactions once it has read what they react to; absolute, so
+                it still shows at the bottom corner. */}
+            {hasEmojis ? (
+              <button
+                ref={emojisRef}
+                type="button"
+                aria-haspopup="dialog"
+                aria-expanded={pickerOpen}
+                lang="en"
+                onClick={() => setPickerOpen((open) => !open)}
+                className="absolute right-1 bottom-0 flex translate-y-1/2 gap-1.5 rounded-full bg-white px-2 py-0.5 text-base transition-[scale] active:scale-105 border-t-[0.5px] border-neutral-200"
+              >
+                <span className="sr-only">Reactions:</span>
+                {emojis?.map((emoji) => (
+                  <span key={emoji}>{emoji}</span>
+                ))}
+                <span className="sr-only">. Add a reaction</span>
+              </button>
+            ) : null}
           </div>
         </div>
         {/* Outside the bubble so its drop-shadow filter doesn't apply to, or
             trap the stacking of, the picker. */}
       </div>
+      {/* The English words go before the link, not in it: VoiceOver read the
+          link out by its name all in English, the lang inside it lost.
+          With only the title in it, the link itself carries the title's lang.
+          sr-only is absolute, so it takes no gap in the column. */}
+      {citation && !typing && (
+        <span lang="en" className="sr-only">
+          {citation.type === "pdf"
+            ? "Source (PDF, opens in a new tab): "
+            : "Source (opens in a new tab): "}
+        </span>
+      )}
       {citation && !typing && (
         <a
           href={citation.href}
+          lang={citation.lang}
           rel="noopener noreferrer"
           target="_blank"
           className="mt-1 -mr-1 mb-2 line-clamp-2 pl-2 text-xs text-blue-600 underline"
@@ -206,13 +232,7 @@ export function ChatBubble({
               className="mr-0.5 inline -translate-y-px text-sm text-black"
             />
           )}
-          <span className="sr-only">Source: </span>
-          <cite lang={citation.lang} className="not-italic">
-            {citation.title}
-          </cite>
-          <span className="sr-only">
-            {citation.type === "pdf" ? " (PDF, opens in a new tab)" : " (opens in a new tab)"}
-          </span>
+          <cite className="not-italic">{citation.title}</cite>
         </a>
       )}
       {pickerOpen && (

@@ -11,11 +11,7 @@ import {
   authSignupProofValid,
   authVerifyCode,
 } from "~/lib/auth.server";
-import {
-  photoDelete,
-  photoStore,
-  SIGNUP_MAX_BYTES,
-} from "~/lib/photo.server";
+import { photoDelete, photoStore, SIGNUP_MAX_BYTES } from "~/lib/photo.server";
 import {
   emailRx,
   getUser,
@@ -80,7 +76,10 @@ export async function action({ request }: Route.ActionArgs): Promise<Result> {
 
     const result = await authCompleteSignup(signupToken, {
       username: String(formData.get("username") ?? ""),
-      name: String(formData.get("name") ?? "").trim().slice(0, 60) || null,
+      name:
+        String(formData.get("name") ?? "")
+          .trim()
+          .slice(0, 60) || null,
       photoKey,
     });
 
@@ -253,7 +252,11 @@ export default function Home({}: Route.ComponentProps) {
             className={`flex h-24 w-24 cursor-pointer items-center justify-center overflow-hidden rounded-full bg-secondary text-white focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-secondary`}
           >
             {photoUrl ? (
-              <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+              <img
+                src={photoUrl}
+                alt=""
+                className="h-full w-full object-cover"
+              />
             ) : (
               <CameraIcon aria-hidden size={32} weight="duotone" />
             )}
@@ -422,70 +425,96 @@ export default function Home({}: Route.ComponentProps) {
             </button>
           </div>
           <p className="w-80 pt-2 text-xs text-neutral-600">
-            No email? To prevent spam we invalidate codes and stop sending emails after a few attempts. If you got the code wrong or missed the email, try again later.&nbsp;
-            <Link to="/privacy" className="underline font-medium">
+            No email? To prevent spam we invalidate codes and stop sending
+            emails after a few attempts. If you got the code wrong or missed the
+            email, try again later.&nbsp;
+            <Link to="/privacy" className="font-medium underline">
               Privacy policy
             </Link>
           </p>
         </div>
       ) : (
-        <fetcher.Form
-          key="email"
-          method="post"
-          aria-labelledby="page-title"
-          className="flex flex-col items-center gap-2"
-        >
-          <h1
-            id="page-title"
-            className="translate-y-1 text-lg font-medium text-secondary"
+        <div className="flex flex-1 flex-col gap-10">
+          {/* Spacers, not justify-center: the free space is split 2:3, so the
+              content sits above centre by a share of what is left over. */}
+          <div className="flex-[1]" />
+          <figure className="w-80 max-w-prose rounded-2xl bg-white p-4 text-sm text-gray-700 drop-shadow-md">
+            {/* the page is lang="en": without this the quote is read with English pronunciation */}
+            <blockquote lang="de">
+              Einer hat immer Unrecht: aber mit zweien beginnt die Wahrheit. –
+              Einer kann sich nicht beweisen: aber zweie kann man bereits nicht
+              widerlegen.
+            </blockquote>
+            <figcaption className="pt-2 text-right text-xs font-antonio">
+              — F. Nietzsche, 1882
+            </figcaption>
+          </figure>
+          <fetcher.Form
+            key="email"
+            method="post"
+            aria-labelledby="page-title"
+            className="flex flex-col items-center gap-2 "
           >
-            sign up or login
-          </h1>
-          <label htmlFor="email" className="sr-only">
-            Email address
-          </label>
-          <input
-            id="email"
-            name="email"
-            // not type="email": the browser would refuse a guest name
-            type="text"
-            inputMode="email"
-            autoCapitalize="none"
-            autoComplete="email"
-            spellCheck={false}
-            required
-            placeholder="email"
-            aria-describedby={
-              current?.error ? "email-error email-hint" : "email-hint"
-            }
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className={field}
-          />
-          <Turnstile
-            onToken={setTurnstileToken}
-            resetSignal={result}
-            className="w-80"
-          />
-          {current?.error && (
-            <p id="email-error" role="alert" className={errorText}>
-              {current.error}
+            <h1
+              id="page-title"
+              className="translate-y-1 text-lg font-medium text-secondary"
+            >
+              Sign up or login
+            </h1>
+            <label htmlFor="email" className="sr-only">
+              Email address
+            </label>
+            <input
+              id="email"
+              name="email"
+              // not type="email": the browser would refuse a guest name
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
+              autoComplete="email"
+              spellCheck={false}
+              required
+              placeholder="email"
+              aria-describedby={
+                current?.error ? "email-error email-hint" : "email-hint"
+              }
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={field}
+            />
+            <Turnstile
+              onToken={setTurnstileToken}
+              resetSignal={result}
+              className="w-80"
+            />
+            {current?.error && (
+              <p id="email-error" role="alert" className={errorText}>
+                {current.error}
+              </p>
+            )}
+            <button
+              type="submit"
+              disabled={!turnstileToken || busy}
+              className={submit}
+            >
+              continue
+            </button>
+            <p id="email-hint" className="w-80 text-sm">
+              Your data stays in the EU. To enter anonymously type{" "}
+              <span className="font-mono font-bold">
+                guest_&lt;any word&gt;
+              </span>
+              .
+              <Link
+                to="/privacy"
+                className="block text-xs font-medium underline"
+              >
+                Privacy
+              </Link>
             </p>
-          )}
-          <button
-            type="submit"
-            disabled={!turnstileToken || busy}
-            className={submit}
-          >
-            continue
-          </button>
-          <p id="email-hint" className="w-80 text-sm">
-            Your data stays in the EU. To enter anonymously type <span className="font-bold font-mono">guest_&lt;any word&gt;</span>.
-            <Link to="/privacy" className="block underline font-medium text-xs">
-              Privacy
-            </Link>
-          </p>
-        </fetcher.Form>
+          </fetcher.Form>
+          <div className="flex-[4]" />
+        </div>
       )}
     </div>
   );
